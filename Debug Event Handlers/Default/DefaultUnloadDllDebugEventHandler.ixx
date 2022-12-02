@@ -36,11 +36,11 @@ void DefaultUnloadDllDebugEventHandler::Handle(const AbstractEvent <DebugEventTy
 
     auto unloadDllData = static_cast<const UNLOAD_DLL_DEBUG_INFO*>(event.GetData());
 
-    auto [dllName, baseAddress] = std::find_if(ansiLibraries.begin(), ansiLibraries.end(),
+    auto nameAndAddress = std::find_if(ansiLibraries.begin(), ansiLibraries.end(),
                                                [unloadDllData](const auto& pair)
                                                {
                                                    return pair.second ==
-                                                          reinterpret_cast<ULONG_PTR>unloadDllData->lpBaseOfDll;
+                                                          reinterpret_cast<ULONG_PTR>(unloadDllData->lpBaseOfDll);
                                                });
 }
 

@@ -2,10 +2,21 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#include "ProcessMemoryManipulation.hpp"
+module;
 
-#include <sstream>
-#include <stdexcept>
+#include <Windows.h>
+
+export module ProcessMemoryManipulation;
+
+import std.core;
+
+export class ProcessMemoryManipulation
+{
+public:
+    static std::string ReadString(HANDLE processHandle, LPVOID address);
+    static std::wstring ReadWString(HANDLE processHandle, LPVOID address);
+    static void* ReadPointer(HANDLE processHandle, LPVOID address);
+};
 
 std::string ProcessMemoryManipulation::ReadString(HANDLE processHandle, LPVOID address)
 {

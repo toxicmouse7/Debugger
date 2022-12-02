@@ -2,7 +2,15 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#include "Utils.hpp"
+export module Utils;
+
+import std.core;
+
+export namespace Utils
+{
+    std::list<std::string> Split(const std::string& str, const std::string& delimiter);
+    std::list<std::wstring> Split(const std::wstring& str, const std::wstring& delimiter);
+}
 
 std::list<std::string> Utils::Split(const std::string& str, const std::string& delimiter)
 {

@@ -2,12 +2,33 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#include <sstream>
+module;
 
-#include "DefaultCreateProcessDebugEventHandler.hpp"
-#include "Logger/Logger.hpp"
-#include "Process Memory Manipultion/ProcessMemoryManipulation.hpp"
-#include "Debug Events/DebugEvent.hpp"
+#include <Windows.h>
+
+export module DefaultCreateProcessDebugEventHandler;
+
+import std.core;
+
+import AbstractEventRecipient;
+import DebugEvent;
+import ProcessMemoryManipulation;
+import Logger;
+
+export class DefaultCreateProcessDebugEventHandler : public AbstractEventRecipient<DebugEventType>
+{
+private:
+    static void LogProcessCreation(const std::string& processName, DWORD processId,
+                                   DWORD threadId, ULONG_PTR startAddress,
+                                   ULONG_PTR baseAddress);
+
+    static void LogProcessCreation(const std::wstring& processName, DWORD processId,
+                                   DWORD threadId, ULONG_PTR startAddress,
+                                   ULONG_PTR baseAddress);
+
+public:
+    void Handle(const AbstractEvent<DebugEventType>& event) override;
+};
 
 void DefaultCreateProcessDebugEventHandler::Handle(const AbstractEvent<DebugEventType>& event)
 {

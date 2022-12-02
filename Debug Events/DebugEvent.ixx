@@ -1,8 +1,25 @@
 //
 // Created by Aleksej on 02.12.2022.
 //
+module;
 
-#include "DebugEvent.hpp"
+#include <Windows.h>
+
+export module DebugEvent;
+
+export import DebugEventType;
+export import AbstractEvent;
+
+export class DebugEvent : public AbstractEvent<DebugEventType>
+{
+private:
+    static DebugEventType GetEventType(const DEBUG_EVENT& event);
+    static const void* GetDebugEventData(const DEBUG_EVENT& event);
+
+public:
+    HANDLE processHandle;
+    explicit DebugEvent(const DEBUG_EVENT& event, HANDLE processHandle);
+};
 
 DebugEvent::DebugEvent(const DEBUG_EVENT& event, HANDLE processHandle)
         : AbstractEvent<DebugEventType>(GetEventType(event),

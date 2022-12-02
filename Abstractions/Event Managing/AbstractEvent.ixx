@@ -2,10 +2,9 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#ifndef DEBUGGER_ABSTRACTEVENT_HPP
-#define DEBUGGER_ABSTRACTEVENT_HPP
+export module AbstractEvent;
 
-template <class AbstractEventType>
+export template <class AbstractEventType>
 class AbstractEvent
 {
 protected:
@@ -23,5 +22,3 @@ public:
     virtual ~AbstractEvent() = default;
 };
 
-
-#endif //DEBUGGER_ABSTRACTEVENT_HPP

@@ -2,14 +2,12 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#ifndef DEBUGGER_CONSOLEMESSAGEHANDLER_HPP
-#define DEBUGGER_CONSOLEMESSAGEHANDLER_HPP
+export module ConsoleMessageHandler;
 
-#include <iostream>
+import std.core;
+import AbstractMessageHandler;
 
-#include "Abstractions/Message Handling/AbstractMessageHandler.hpp"
-
-class ConsoleMessageHandler : public AbstractMessageHandler
+export class ConsoleMessageHandler : public AbstractMessageHandler
 {
 public:
     void HandleMessage(const std::string& message) override;
@@ -25,6 +23,3 @@ void ConsoleMessageHandler::HandleMessage(const std::wstring& message)
 {
     std::wcout << message << std::endl;
 }
-
-
-#endif //DEBUGGER_CONSOLEMESSAGEHANDLER_HPP

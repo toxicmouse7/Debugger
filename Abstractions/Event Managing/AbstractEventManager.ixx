@@ -2,15 +2,13 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#ifndef DEBUGGER_ABSTRACTEVENTMANAGER_HPP
-#define DEBUGGER_ABSTRACTEVENTMANAGER_HPP
+export module AbstractEventManager;
 
-#include <list>
+import std.core;
+import AbstractEvent;
+import AbstractEventRecipient;
 
-#include "AbstractEventRecipient.hpp"
-#include "AbstractEvent.hpp"
-
-template<class AbstractEventType>
+export template<class AbstractEventType>
 class AbstractEventManager
 {
 protected:
@@ -27,6 +25,3 @@ public:
         recipients.remove(recipient);
     };
 };
-
-
-#endif //DEBUGGER_ABSTRACTEVENTMANAGER_HPP

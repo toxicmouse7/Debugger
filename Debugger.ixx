@@ -1,15 +1,52 @@
 //
 // Created by Aleksej on 02.12.2022.
 //
+module;
 
-#include "Debugger.hpp"
+#include <Windows.h>
 
-#include "Logger/Logger.hpp"
-#include "Logger/Message Handlers/ConsoleMessageHandler.hpp"
-#include "Debug Event Hadlers/Default/DefaultExceptionDebugEventHandler.hpp"
-#include "Debug Event Hadlers/Default/DefaultCreateProcessDebugEventHandler.hpp"
-#include "Debug Event Hadlers/Default/DefaultLoadDllDebugEventHandler.hpp"
-#include "Debug Event Hadlers/Default/DefaultCreateThreadDebugEventHandler.hpp"
+export module Debugger;
+
+import std.core;
+import std.filesystem;
+
+import DebugEvent;
+import AbstractEventManager;
+import DefaultCreateProcessDebugEventHandler;
+import DefaultCreateThreadDebugEventHandler;
+import DefaultExceptionDebugEventHandler;
+import DefaultLoadDllDebugEventHandler;
+
+export class Debugger : public AbstractEventManager<DebugEventType>
+{
+private:
+    inline static Debugger* instance = nullptr;
+    HANDLE processHandle = nullptr;
+    std::list<std::pair<std::string, ULONG_PTR>> ansiLibraries;
+    std::list<std::pair<std::wstring, ULONG_PTR>> unicodeLibraries;
+    std::list<std::pair<DWORD, ULONG_PTR>> threads;
+
+    Debugger();
+
+    void OpenProcess(DWORD processId);
+
+    void CreateDebugProcess(const std::filesystem::path& pathToExecutable);
+
+    void Run();
+
+    void NotifyAll(const AbstractEvent<DebugEventType>& event) override;
+
+public:
+    Debugger& operator=(const Debugger&) = delete;
+
+    Debugger(const Debugger&) = delete;
+
+    static Debugger* GetInstance();
+
+    void StartAndAttach(const std::filesystem::path& pathToExecutable);
+
+    void Attach(DWORD processId);
+};
 
 Debugger* Debugger::GetInstance()
 {
@@ -117,8 +154,6 @@ Debugger::Debugger()
     {
         throw std::runtime_error("Debugger is already created");
     }
-
-    Logger::GetInstance()->AddMessageHandler(new ConsoleMessageHandler());
 
     recipients.push_back(new DefaultExceptionDebugEventHandler());
     recipients.push_back(new DefaultCreateProcessDebugEventHandler());

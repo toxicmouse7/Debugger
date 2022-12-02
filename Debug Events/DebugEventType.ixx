@@ -2,11 +2,10 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#ifndef DEBUGGER_DEBUGEVENTTYPE_HPP
-#define DEBUGGER_DEBUGEVENTTYPE_HPP
+export module DebugEventType;
 
 
-enum class DebugEventType
+export enum class DebugEventType
 {
     eCreateProcess,
     eCreateThread,
@@ -25,6 +24,3 @@ enum class DebugEventType
     eDebugString,
     eRipEvent
 };
-
-
-#endif //DEBUGGER_DEBUGEVENTTYPE_HPP

@@ -2,13 +2,34 @@
 // Created by Aleksej on 02.12.2022.
 //
 
-#include <sstream>
+module;
 
-#include "DefaultCreateThreadDebugEventHandler.hpp"
-#include "Debug Events/DebugEvent.hpp"
-#include "Logger/Logger.hpp"
+#include <Windows.h>
 
-void DefaultCreateThreadDebugEventHandler::Handle(const AbstractEvent<DebugEventType>& event)
+export module DefaultCreateThreadDebugEventHandler;
+
+import std.core;
+
+import AbstractEventRecipient;
+import DebugEvent;
+import Logger;
+
+export class DefaultCreateThreadDebugEventHandler : public AbstractEventRecipient<DebugEventType>
+{
+private:
+    std::list<std::pair<DWORD, ULONG_PTR>>& threads;
+
+    static void LogThreadCreation(DWORD threadId, ULONG_PTR startAddress);
+
+    void AddThread(DWORD threadId, ULONG_PTR startAddress);
+
+public:
+    explicit DefaultCreateThreadDebugEventHandler(std::list<std::pair<DWORD, ULONG_PTR>>& threads);
+
+    void Handle(const AbstractEvent <DebugEventType>& event) override;
+};
+
+void DefaultCreateThreadDebugEventHandler::Handle(const AbstractEvent <DebugEventType>& event)
 {
     if (event.eventType != DebugEventType::eCreateThread)
         return;

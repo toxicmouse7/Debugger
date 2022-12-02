@@ -22,8 +22,6 @@ add_executable(Debugger
         "Debug Event Handlers/Default/DefaultCreateThreadDebugEventHandler.ixx"
         Debugger.ixx
         main.cpp
-        )
-
-target_include_directories(Debugger PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+        "Debug Event Handlers/Default/DefaultUnloadDllDebugEventHandler.ixx")
 
 target_compile_options(Debugger PRIVATE ${CXX_MODULES_FLAGS})

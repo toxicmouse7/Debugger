@@ -37,3 +37,43 @@ std::list<std::wstring> Utils::Split(const std::wstring& str, const std::wstring
 
     return result;
 }
+
+std::optional<std::string>
+Utils::FindLibraryByAddress(const std::list<std::pair<std::string, ULONG_PTR>>& libraries, ULONG_PTR address)
+{
+    auto it = std::find_if(libraries.begin(), libraries.end(),
+                           [address](const auto& pair)
+                           {
+                               return pair.second == address;
+                           });
+
+    if (it == libraries.end())
+        return std::nullopt;
+
+    return it->first;
+}
+
+std::optional<std::wstring>
+Utils::FindLibraryByAddress(const std::list<std::pair<std::wstring, ULONG_PTR>>& libraries, ULONG_PTR address)
+{
+    auto it = std::find_if(libraries.begin(), libraries.end(),
+                           [address](const auto& pair)
+                           {
+                               return pair.second == address;
+                           });
+
+    if (it == libraries.end())
+        return std::nullopt;
+
+    return it->first;
+}
+
+std::string Utils::FormatAddress(ULONG_PTR address, const std::string& delimiter)
+{
+    return std::format("{:0>8X}", address >> 32) + delimiter + std::format("{:0>8X}", address & 0xFFFFFFFF);
+}
+
+std::wstring Utils::FormatAddress(ULONG_PTR address, const std::wstring& delimiter)
+{
+    return std::format(L"{:0>8X}", address >> 32) + delimiter + std::format(L"{:0>8X}", address & 0xFFFFFFFF);
+}

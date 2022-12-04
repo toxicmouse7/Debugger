@@ -5,27 +5,32 @@
 #ifndef DEBUGGER_ABSTRACTEVENTMANAGER_HPP
 #define DEBUGGER_ABSTRACTEVENTMANAGER_HPP
 
+#include <map>
 #include <list>
 
 #include "AbstractEventRecipient.hpp"
 #include "AbstractEvent.hpp"
 
-template<class AbstractEventType>
+template<class RecipientType>
 class AbstractEventManager
 {
 protected:
-    std::list<AbstractEventRecipient<AbstractEventType>*> recipients;
-public:
-    virtual void NotifyAll(const AbstractEvent<AbstractEventType>& event) = 0;
-    void AddRecipient(AbstractEventRecipient<AbstractEventType>* recipient)
+    std::map<RecipientType, std::list<AbstractEventRecipient*>> recipients;
+
+    void AddRecipient(RecipientType recipientType, AbstractEventRecipient* recipient)
     {
-        recipients.push_back(recipient);
+        recipients[recipientType].push_back(recipient);
     };
 
-    void RemoveRecipient(AbstractEventRecipient<AbstractEventType>* recipient)
+    void RemoveRecipient(RecipientType recipientType, AbstractEventRecipient* recipient)
     {
-        recipients.remove(recipient);
+        recipients[recipientType].remove(recipient);
     };
+
+public:
+    virtual void Notify(RecipientType recipientType, const AbstractEvent& event) = 0;
+
+    virtual ~AbstractEventManager() = default;
 };
 
 

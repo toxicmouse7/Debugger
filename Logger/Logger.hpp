@@ -6,25 +6,29 @@
 #define DEBUGGER_LOGGER_HPP
 
 #include <string>
+#include <map>
 #include <list>
+#include <memory>
 
 #include "Abstractions/Message Handling/AbstractMessageHandler.hpp"
 
 class Logger
 {
 private:
-    inline static Logger* instance = nullptr;
+    inline static std::map<std::string, Logger*> loggers = {};
 
     Logger() = default;
 
     std::list<AbstractMessageHandler*> messageHandlers;
 
 public:
-    static Logger* GetInstance();
+    static Logger& GetInstance(const std::string& loggerName);
 
-    void Log(const std::string& message);
+    static Logger& GetInstance(std::string&& loggerName);
 
-    void Log(const std::wstring& message);
+    void Log(const std::string& message) const;
+
+    void Log(const std::wstring& message) const;
 
     void AddMessageHandler(AbstractMessageHandler* messageHandler);
 

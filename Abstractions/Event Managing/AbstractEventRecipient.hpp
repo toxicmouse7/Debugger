@@ -8,11 +8,11 @@
 
 #include "AbstractEvent.hpp"
 
-template<class AbstractEventType>
 class AbstractEventRecipient
 {
 public:
-    virtual void Handle(const AbstractEvent<AbstractEventType>& event) = 0;
+    virtual void Handle(const AbstractEvent& event) = 0;
+    virtual ~AbstractEventRecipient() = default;
 };
 
 

@@ -12,7 +12,7 @@
 class ExceptionDebugEvent : public AbstractDebugEvent<EXCEPTION_DEBUG_INFO>
 {
 public:
-    ExceptionDebugEvent(unsigned int threadId, unsigned int processId, const EXCEPTION_DEBUG_INFO& payload)
+    ExceptionDebugEvent(unsigned int threadId, unsigned int processId, EXCEPTION_DEBUG_INFO payload)
             : AbstractDebugEvent(threadId, processId, payload) {}
 };
 

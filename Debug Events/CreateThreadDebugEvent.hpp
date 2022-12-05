@@ -12,7 +12,7 @@
 class CreateThreadDebugEvent : public AbstractDebugEvent<CREATE_THREAD_DEBUG_INFO>
 {
 public:
-    CreateThreadDebugEvent(unsigned int threadId, unsigned int processId, const CREATE_THREAD_DEBUG_INFO& payload)
+    CreateThreadDebugEvent(unsigned int threadId, unsigned int processId, CREATE_THREAD_DEBUG_INFO payload)
             : AbstractDebugEvent(threadId, processId, payload) {}
 };
 

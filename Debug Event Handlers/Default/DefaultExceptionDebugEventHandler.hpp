@@ -12,16 +12,13 @@ class DefaultExceptionDebugEventHandler : public AbstractExceptionDebugEventHand
 private:
     void HandleDebugEvent(const ExceptionDebugEvent& event) override;
 
-    void HandleBreakpoint(const ExceptionDebugEvent& event) override;
-
     void LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
                       ULONG_PTR exceptionAddress) const override;
 
-    void LogBreakpoint() const override;
-
 public:
-    explicit DefaultExceptionDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger)
-            : AbstractExceptionDebugEventHandler(logger) {}
+    explicit DefaultExceptionDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger,
+                                               const ExceptionContext& exceptionContext)
+            : AbstractExceptionDebugEventHandler(logger, exceptionContext) {}
 
     ~DefaultExceptionDebugEventHandler() override = default;
 };

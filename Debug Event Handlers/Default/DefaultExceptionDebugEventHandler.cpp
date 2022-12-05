@@ -4,16 +4,15 @@
 
 #include "DefaultExceptionDebugEventHandler.hpp"
 
+#include <iomanip>
+
 void DefaultExceptionDebugEventHandler::HandleDebugEvent(const ExceptionDebugEvent& event)
 {
     LogException(event.processId, ExceptionCodeToString(event.payload.ExceptionRecord.ExceptionCode),
                  event.payload.ExceptionRecord.ExceptionCode,
                  reinterpret_cast<ULONG_PTR>(event.payload.ExceptionRecord.ExceptionAddress));
-}
 
-void DefaultExceptionDebugEventHandler::HandleBreakpoint(const ExceptionDebugEvent& event)
-{
-    LogBreakpoint();
+
 }
 
 void DefaultExceptionDebugEventHandler::LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
@@ -22,16 +21,9 @@ void DefaultExceptionDebugEventHandler::LogException(DWORD pid, const std::strin
     if (GetLogger().has_value())
     {
         std::stringstream ss;
-        ss << "Process " << pid << " encountered exception " << exceptionName << " with code " << exceptionCode
-           << " at address " << Utils::FormatAddress(exceptionAddress, "'");
+        ss << "Process " << pid << " encountered exception " << std::quoted(exceptionName);
+        ss << " with code " << std::hex << exceptionCode;
+        ss << " at address " << Utils::FormatAddress(exceptionAddress, "'");
         GetLogger().value().get().Log(ss.str());
-    }
-}
-
-void DefaultExceptionDebugEventHandler::LogBreakpoint() const
-{
-    if (GetLogger().has_value())
-    {
-        GetLogger().value().get().Log("Breakpoint hit");
     }
 }

@@ -12,7 +12,7 @@
 class UnloadDllDebugEvent : public AbstractDebugEvent<UNLOAD_DLL_DEBUG_INFO>
 {
 public:
-    UnloadDllDebugEvent(unsigned int threadId, unsigned int processId, const UNLOAD_DLL_DEBUG_INFO & payload)
+    UnloadDllDebugEvent(unsigned int threadId, unsigned int processId, UNLOAD_DLL_DEBUG_INFO payload)
             : AbstractDebugEvent(threadId, processId, payload) {}
 };
 

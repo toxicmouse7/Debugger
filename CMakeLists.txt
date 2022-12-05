@@ -8,7 +8,7 @@ option(ZYDIS_BUILD_EXAMPLES "" OFF)
 add_subdirectory("deps/zydis")
 
 add_executable(Debugger main.cpp
-        Debugger.hpp
+        Debugger/Debugger.hpp
         "Abstractions/Event Managing/AbstractEvent.hpp"
         "Abstractions/Event Managing/AbstractEventManager.hpp"
         "Abstractions/Event Managing/AbstractEventRecipient.hpp"
@@ -45,7 +45,7 @@ add_executable(Debugger main.cpp
         "Debug Event Handlers/Default/DefaultUnloadDllDebugEventHandler.cpp"
         "Debug Event Handlers/Default/DefaultUnloadDllDebugEventHandler.hpp"
         "Debug Event Handlers/Default/DefaultExitThreadDebugEventHandler.cpp"
-        "Debug Event Handlers/Default/DefaultExitThreadDebugEventHandler.hpp" "Abstractions/Debug Event Handlers/AbstractExceptionDebugEventHandler.hpp" "Debug Events/ExceptionDebugEvent.hpp" "Debug Event Handlers/Default/DefaultExceptionDebugEventHandler.cpp" "Debug Event Handlers/Default/DefaultExceptionDebugEventHandler.hpp")
+        "Debug Event Handlers/Default/DefaultExitThreadDebugEventHandler.hpp" "Abstractions/Debug Event Handlers/AbstractExceptionDebugEventHandler.hpp" "Debug Events/ExceptionDebugEvent.hpp" "Debug Event Handlers/Default/DefaultExceptionDebugEventHandler.cpp" "Debug Event Handlers/Default/DefaultExceptionDebugEventHandler.hpp" Debugger/ExceptionContext.hpp Debugger/Breakpoint.hpp "Debug Event Handlers/Default/DefaultBreakpointOnStartHandler.cpp" "Debug Event Handlers/Default/DefaultBreakpointOnStartHandler.hpp" Debugger/Breakpoint.cpp "Debug Event Handlers/TraceDebugEventHandler.cpp" "Debug Event Handlers/TraceDebugEventHandler.hpp")
 
 target_include_directories(Debugger PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 

@@ -5,6 +5,9 @@
 #ifndef DEBUGGER_ABSTRACTEXCEPTIONDEBUGEVENTHANDLER_HPP
 #define DEBUGGER_ABSTRACTEXCEPTIONDEBUGEVENTHANDLER_HPP
 
+#define STATUS_WX86_BREAKPOINT 0x4000001fL
+#define STATUS_WX86_SINGLE_STEP 0x4000001eL
+
 #include <list>
 #include <sstream>
 #include <optional>
@@ -13,11 +16,11 @@
 #include "Debug Events/ExceptionDebugEvent.hpp"
 #include "Logger/Logger.hpp"
 #include "Utils/Utils.hpp"
+#include "Debugger/ExceptionContext.hpp"
 
 class AbstractExceptionDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    //std::list<>
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -26,6 +29,8 @@ private:
     }
 
 protected:
+    const ExceptionContext& exceptionContext;
+
     [[nodiscard]] virtual const std::optional<std::reference_wrapper<const Logger>>& GetLogger() const
     {
         return logger;
@@ -33,12 +38,8 @@ protected:
 
     virtual void HandleDebugEvent(const ExceptionDebugEvent& event) = 0;
 
-    virtual void HandleBreakpoint(const ExceptionDebugEvent& event) = 0;
-
     virtual void LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
                               ULONG_PTR exceptionAddress) const = 0;
-
-    virtual void LogBreakpoint() const = 0;
 
     static std::string ExceptionCodeToString(DWORD exceptionCode)
     {
@@ -51,6 +52,7 @@ protected:
                 return "The thread tried to access an array element that is out of bounds and the underlying hardware"
                        " supports bounds checking.";
             case EXCEPTION_BREAKPOINT:
+            case STATUS_WX86_BREAKPOINT:
                 return "A breakpoint was encountered.";
             case EXCEPTION_DATATYPE_MISALIGNMENT:
                 return "The thread tried to read or write data that is misaligned on"
@@ -90,6 +92,7 @@ protected:
                 return "The thread tried to execute an instruction whose"
                        " operation is not allowed in the current machine mode.";
             case EXCEPTION_SINGLE_STEP:
+            case STATUS_WX86_SINGLE_STEP:
                 return "A trace trap or other single-instruction mechanism"
                        " signaled that one instruction has been executed.";
             case EXCEPTION_STACK_OVERFLOW:
@@ -100,7 +103,9 @@ protected:
     }
 
 public:
-    explicit AbstractExceptionDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger)
+    explicit AbstractExceptionDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger,
+                                                const ExceptionContext& exceptionContext)
+            : exceptionContext(exceptionContext)
     {
         if (logger.has_value())
             SetLogger(logger.value());

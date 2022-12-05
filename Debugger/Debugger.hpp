@@ -14,6 +14,16 @@
 #include "Debug Events/DebugEvents.hpp"
 #include "Abstractions/Debug Event Handlers/AbstractDebugEventHandlers.hpp"
 #include "Logger/Logger.hpp"
+#include "ExceptionContext.hpp"
+#include "Debug Event Handlers/Default/DefaultBreakpointOnStartHandler.hpp"
+
+enum class DebuggerState
+{
+    NotStarted,
+    Running,
+    Paused,
+    Stopped
+};
 
 template<class T, class U>
 concept Derived = std::is_base_of<U, T>::value;
@@ -23,9 +33,16 @@ class Debugger : public AbstractEventManager<DebugEventHandlerType>
 private:
     inline static Debugger* instance = nullptr;
     HANDLE processHandle = nullptr;
+    DebuggerState state = DebuggerState::NotStarted;
     std::list<std::pair<std::string, ULONG_PTR>> ansiLibraries;
     std::list<std::pair<std::wstring, ULONG_PTR>> unicodeLibraries;
     std::list<std::pair<DWORD, ULONG_PTR>> threads;
+    std::list<std::shared_ptr<Breakpoint>> breakpoints;
+
+    std::optional<std::reference_wrapper<const Logger>> errorLogger;
+
+    std::shared_ptr<ExceptionDebugEvent> lastExceptionEvent = nullptr;
+    std::shared_ptr<Breakpoint> lastBreakpoint = nullptr;
 
     Debugger();
 
@@ -41,6 +58,8 @@ private:
 
     static DebugEventHandlerType DebugEventToDebugEventHandlerType(const DEBUG_EVENT& debugEvent);
 
+    std::shared_ptr<Breakpoint> FindBreakpoint(DWORD pid, ULONG_PTR address) const;
+
 public:
     Debugger& operator=(const Debugger&) = delete;
 
@@ -48,9 +67,15 @@ public:
 
     static Debugger* GetInstance();
 
-    void CreateAndAttach(const std::filesystem::path& pathToExecutable);
+    const DebuggerState& CreateAndAttach(const std::filesystem::path& pathToExecutable, bool pauseAtStart);
 
     void Attach(DWORD processId);
+
+    ExceptionContext WaitForDebugEvent();
+
+    void SetBreakpoint(ULONG_PTR address);
+
+    void SetErrorLogger(const Logger& logger);
 
     template<Derived<AbstractLoadDllDebugEventHandler> LoadDllHandler>
     void AddLoadDllHandler(const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
@@ -89,9 +114,10 @@ public:
     }
 
     template<Derived<AbstractExceptionDebugEventHandler> ExceptionHandler>
-    void AddExceptionHandler(const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
+    void UseResolver(const ExceptionContext& exceptionContext,
+                     const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
     {
-        AddRecipient(DebugEventHandlerType::eUnloadDll, new ExceptionHandler(logger));
+        ExceptionHandler(logger, exceptionContext).Handle(*lastExceptionEvent);
     }
 };
 
@@ -140,7 +166,7 @@ void Debugger::CreateDebugProcess(const std::filesystem::path& pathToExecutable)
                         nullptr,
                         nullptr,
                         false,
-                        DEBUG_PROCESS | CREATE_NEW_CONSOLE,
+                        DEBUG_ONLY_THIS_PROCESS | CREATE_NEW_CONSOLE,
                         nullptr,
                         nullptr,
                         &startupInfo,
@@ -155,10 +181,24 @@ void Debugger::CreateDebugProcess(const std::filesystem::path& pathToExecutable)
     CloseHandle(processInformation.hThread);
 }
 
-void Debugger::CreateAndAttach(const std::filesystem::path& pathToExecutable)
+const DebuggerState& Debugger::CreateAndAttach(const std::filesystem::path& pathToExecutable, bool pauseAtStart)
 {
+    if (processHandle != nullptr)
+    {
+        throw std::runtime_error("Some process is already opened");
+    }
+
+    if (pauseAtStart)
+    {
+        AddRecipient(DebugEventHandlerType::eCreateProcess,
+                     new DefaultBreakpointOnStartHandler([this](ULONG_PTR address)
+                                                         {
+                                                             SetBreakpoint(address);
+                                                         }));
+    }
+
     CreateDebugProcess(pathToExecutable);
-    DebugLoop();
+    return state;
 }
 
 void Debugger::Attach(DWORD processId)
@@ -173,20 +213,32 @@ void Debugger::DebugLoop()
     while (true)
     {
         DEBUG_EVENT debugEvent;
-        if (!WaitForDebugEvent(&debugEvent, INFINITE))
+        if (!::WaitForDebugEvent(&debugEvent, INFINITE))
         {
             break;
         }
 
         try
         {
-            auto debugEventHandlerType = DebugEventToDebugEventHandlerType(debugEvent);;
+            auto debugEventHandlerType = DebugEventToDebugEventHandlerType(debugEvent);
+
+            if (debugEventHandlerType == eException)
+            {
+                lastExceptionEvent = std::dynamic_pointer_cast<ExceptionDebugEvent>(
+                        DebugEventToAbstractEvent(debugEvent));
+                state = DebuggerState::Paused;
+                return;
+            }
+
             auto abstractEvent = DebugEventToAbstractEvent(debugEvent);
             Notify(debugEventHandlerType, *abstractEvent);
         }
         catch (const std::exception& exception)
         {
-//            std::cout << exception.what() << std::endl;
+            if (errorLogger.has_value())
+            {
+                errorLogger.value().get().Log(exception.what());
+            }
         }
 
 
@@ -275,6 +327,68 @@ DebugEventHandlerType Debugger::DebugEventToDebugEventHandlerType(const DEBUG_EV
         default:
             throw std::runtime_error("Unknown debug event");
     }
+}
+
+ExceptionContext Debugger::WaitForDebugEvent()
+{
+    if (state == DebuggerState::NotStarted || state == DebuggerState::Paused)
+    {
+        if (state == DebuggerState::Paused &&
+            !ContinueDebugEvent(lastExceptionEvent->processId, lastExceptionEvent->threadId, DBG_CONTINUE))
+        {
+            throw std::runtime_error("Failed to continue debug event");
+        }
+
+        state = DebuggerState::Running;
+
+        if (lastBreakpoint)
+        {
+            lastBreakpoint->Enable();
+            lastBreakpoint.reset();
+        }
+    }
+
+    DebugLoop();
+
+    bool isExternalBreakpoint = true;
+    auto breakpoint = FindBreakpoint(lastExceptionEvent->processId,
+                                     reinterpret_cast<ULONG_PTR>(lastExceptionEvent->payload
+                                             .ExceptionRecord.ExceptionAddress));
+
+    if (breakpoint != nullptr)
+    {
+        isExternalBreakpoint = false;
+        breakpoint->Disable();
+        lastBreakpoint = breakpoint;
+    }
+
+    return {lastExceptionEvent, isExternalBreakpoint};
+}
+
+void Debugger::SetBreakpoint(ULONG_PTR address)
+{
+    DWORD pid = GetProcessId(processHandle);
+    auto breakpoint = std::make_shared<Breakpoint>(pid, address);
+
+    breakpoints.push_back(breakpoint);
+}
+
+void Debugger::SetErrorLogger(const Logger& logger)
+{
+    errorLogger = logger;
+}
+
+std::shared_ptr<Breakpoint> Debugger::FindBreakpoint(DWORD pid, ULONG_PTR address) const
+{
+    for (auto& breakpoint: breakpoints)
+    {
+        if (breakpoint->GetProcessId() == pid && breakpoint->GetAddress() == address)
+        {
+            return breakpoint;
+        }
+    }
+
+    return nullptr;
 }
 
 #endif //DEBUGGER_DEBUGGER_HPP

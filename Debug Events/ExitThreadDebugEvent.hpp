@@ -12,7 +12,7 @@
 class ExitThreadDebugEvent : public AbstractDebugEvent<EXIT_THREAD_DEBUG_INFO>
 {
 public:
-    ExitThreadDebugEvent(unsigned int threadId, unsigned int processId, const EXIT_THREAD_DEBUG_INFO & payload)
+    ExitThreadDebugEvent(unsigned int threadId, unsigned int processId, EXIT_THREAD_DEBUG_INFO payload)
             : AbstractDebugEvent(threadId, processId, payload) {}
 };
 

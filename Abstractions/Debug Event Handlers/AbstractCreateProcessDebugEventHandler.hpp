@@ -13,6 +13,7 @@
 #include "Debug Events/CreateProcessDebugEvent.hpp"
 #include "Logger/Logger.hpp"
 #include "Utils/Utils.hpp"
+#include "Debugger/Breakpoint.hpp"
 
 class AbstractCreateProcessDebugEventHandler : public AbstractEventRecipient
 {
@@ -32,13 +33,11 @@ protected:
 
     virtual void HandleDebugEvent(const CreateProcessDebugEvent& event) = 0;
 
-    virtual void
-    LogCreateProcess(DWORD pid, DWORD tid, const std::string& processName,
-                     ULONG_PTR baseAddress, ULONG_PTR entryPoint) const = 0;
+    virtual void LogCreateProcess(DWORD pid, DWORD tid, const std::string& processName,
+                                  ULONG_PTR baseAddress, ULONG_PTR entryPoint) const = 0;
 
-    virtual void
-    LogCreateProcess(DWORD pid, DWORD tid, const std::wstring& libraryName,
-                     ULONG_PTR baseAddress, ULONG_PTR entryPoint) const = 0;
+    virtual void LogCreateProcess(DWORD pid, DWORD tid, const std::wstring& libraryName,
+                                  ULONG_PTR baseAddress, ULONG_PTR entryPoint) const = 0;
 
 public:
     explicit AbstractCreateProcessDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger)

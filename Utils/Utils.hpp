@@ -7,26 +7,35 @@
 
 #include <Windows.h>
 #include <list>
-#include <string>
+#include <sstream>
 #include <optional>
 #include <format>
+#include <Zydis/Zydis.h>
 
 #include "Debug Event Handlers/DebugEventHandlerType.hpp"
+#include "Process Memory Manipulation/ProcessMemoryManipulation.hpp"
 
-namespace Utils
+class Utils
 {
-    std::list<std::string> Split(const std::string& str, const std::string& delimiter);
+public:
+    static std::list<std::string> Split(const std::string& str, const std::string& delimiter);
 
-    std::list<std::wstring> Split(const std::wstring& str, const std::wstring& delimiter);
+    static std::list<std::wstring> Split(const std::wstring& str, const std::wstring& delimiter);
 
-    std::optional<std::string>
+    static std::optional<std::string>
     FindLibraryByAddress(const std::list<std::pair<std::string, ULONG_PTR>>& libraries, ULONG_PTR address);
 
-    std::optional<std::wstring>
+    static std::optional<std::wstring>
     FindLibraryByAddress(const std::list<std::pair<std::wstring, ULONG_PTR>>& libraries, ULONG_PTR address);
 
-    std::string FormatAddress(ULONG_PTR address, const std::string& delimiter);
-    std::wstring FormatAddress(ULONG_PTR address, const std::wstring& delimiter);
+    static std::string FormatAddress(ULONG_PTR address, const std::string& delimiter);
+
+    static std::wstring FormatAddress(ULONG_PTR address, const std::wstring& delimiter);
+
+    static void DisassembleInstruction(DWORD processId, const CONTEXT& context, bool isWow64,
+                                       ZydisDisassembledInstruction* instruction);
+
+    static std::string FormatRegisters(const CONTEXT& context, bool isWow64);
 };
 
 

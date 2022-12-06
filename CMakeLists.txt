@@ -50,3 +50,28 @@ add_executable(Debugger main.cpp
 target_include_directories(Debugger PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(Debugger PRIVATE Zydis)
+
+execute_process(
+        COMMAND "$ENV{ProgramFiles\(x86\)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -property installationPath
+        OUTPUT_VARIABLE VSWHERE_LATEST
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+find_path(
+        DIASDK_INCLUDE_DIR
+        dia2.h
+        HINTS "${VSWHERE_LATEST}/DIA SDK/include"
+)
+
+find_library(
+        DIASDK_GUIDS_LIBRARY
+        NAMES diaguids.lib
+        HINTS ${DIASDK_INCLUDE_DIR}/../lib/amd64
+)
+
+message(STATUS "DIA SDK include: ${DIASDK_INCLUDE_DIR}")
+message(STATUS "DIA SDK lib: ${DIASDK_GUIDS_LIBRARY}")
+
+target_include_directories(Debugger PRIVATE ${DIASDK_INCLUDE_DIR})
+
+target_link_libraries(Debugger PRIVATE ${DIASDK_GUIDS_LIBRARY})

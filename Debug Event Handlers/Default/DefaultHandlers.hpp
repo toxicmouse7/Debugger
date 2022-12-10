@@ -12,6 +12,7 @@
 #include "DefaultExitThreadDebugEventHandler.hpp"
 #include "DefaultCreateThreadDebugEventHandler.hpp"
 #include "DefaultExceptionDebugEventHandler.hpp"
+#include "DefaultBreakpointResolver.hpp"
 //#include "DefaultOutputDebugStringDebugEventHandler.hpp"
 //#include "DefaultRipDebugEventHandler.hpp"
 

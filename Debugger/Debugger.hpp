@@ -8,6 +8,7 @@
 #include <Windows.h>
 #include <filesystem>
 #include <memory>
+#include <map>
 
 #include "Abstractions/Event Managing/AbstractEventManager.hpp"
 #include "Debug Event Handlers/DebugEventHandlerType.hpp"
@@ -16,6 +17,7 @@
 #include "Logger/Logger.hpp"
 #include "ExceptionContext.hpp"
 #include "Debug Event Handlers/Default/DefaultBreakpointOnStartHandler.hpp"
+#include "Debug Event Handlers/Default/DefaultBreakpointResolver.hpp"
 
 enum class DebuggerState
 {
@@ -34,48 +36,368 @@ private:
     inline static Debugger* instance = nullptr;
     HANDLE processHandle = nullptr;
     DebuggerState state = DebuggerState::NotStarted;
-    std::list<std::pair<std::string, ULONG_PTR>> ansiLibraries;
-    std::list<std::pair<std::wstring, ULONG_PTR>> unicodeLibraries;
-    std::list<std::pair<DWORD, ULONG_PTR>> threads;
+    std::map<std::string, ULONG_PTR> ansiLibraries;
+    std::map<std::wstring, ULONG_PTR> unicodeLibraries;
+    std::map<DWORD, ULONG_PTR> threads;
     std::list<std::shared_ptr<Breakpoint>> breakpoints;
+    bool isWow64 = false;
 
     std::optional<std::reference_wrapper<const Logger>> errorLogger;
 
     std::shared_ptr<ExceptionDebugEvent> lastExceptionEvent = nullptr;
-    std::shared_ptr<Breakpoint> lastBreakpoint = nullptr;
 
-    Debugger();
+    Debugger()
+    {
+        if (instance != nullptr)
+        {
+            throw std::runtime_error("Debugger is already created");
+        }
+    }
 
-    void OpenProcess(DWORD processId);
+    void OpenProcess(DWORD processId)
+    {
+        if (processHandle != nullptr)
+        {
+            throw std::runtime_error("Some process is already opened");
+        }
 
-    void CreateDebugProcess(const std::filesystem::path& pathToExecutable);
+        processHandle = ::OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
+        if (processHandle == nullptr)
+        {
+            throw std::runtime_error("Failed to open process");
+        }
+    }
 
-    void DebugLoop();
+    void CreateDebugProcess(const std::filesystem::path& pathToExecutable)
+    {
+        if (processHandle != nullptr)
+        {
+            throw std::runtime_error("Some process is already opened");
+        }
 
-    void Notify(DebugEventHandlerType debugEventHandlerType, const AbstractEvent& event) override;
+        STARTUPINFOW startupInfo;
+        PROCESS_INFORMATION processInformation;
 
-    static std::shared_ptr<AbstractEvent> DebugEventToAbstractEvent(const DEBUG_EVENT& debugEvent);
+        ZeroMemory(&processInformation, sizeof(processInformation));
+        ZeroMemory(&startupInfo, sizeof(startupInfo));
+        startupInfo.cb = sizeof(startupInfo);
+        startupInfo.dwFlags = STARTF_USESHOWWINDOW;
+        startupInfo.wShowWindow = SW_SHOWNORMAL;
 
-    static DebugEventHandlerType DebugEventToDebugEventHandlerType(const DEBUG_EVENT& debugEvent);
+        // Start the child process.
+        if (!CreateProcessW(pathToExecutable.c_str(),
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            false,
+                            DEBUG_ONLY_THIS_PROCESS | CREATE_NEW_CONSOLE,
+                            nullptr,
+                            nullptr,
+                            &startupInfo,
+                            &processInformation)
+                )
+        {
+            throw std::runtime_error("CreateProcess failed (" + std::to_string(GetLastError()) + ")");
+        }
 
-    std::shared_ptr<Breakpoint> FindBreakpoint(DWORD pid, ULONG_PTR address) const;
+        BOOL isWow64Process = false;
+        if (!IsWow64Process(processInformation.hProcess, &isWow64Process))
+        {
+            throw std::runtime_error("IsWow64Process failed (" + std::to_string(GetLastError()) + ")");
+        }
+
+        this->isWow64 = isWow64Process;
+
+        this->processHandle = processInformation.hProcess;
+
+        CloseHandle(processInformation.hThread);
+    }
+
+    void DebugLoop()
+    {
+        while (true)
+        {
+            DEBUG_EVENT debugEvent;
+            if (!::WaitForDebugEvent(&debugEvent, INFINITE))
+            {
+                break;
+            }
+
+            try
+            {
+                auto debugEventHandlerType = DebugEventToDebugEventHandlerType(debugEvent);
+
+                if (debugEventHandlerType == eException)
+                {
+                    lastExceptionEvent = std::dynamic_pointer_cast<ExceptionDebugEvent>(
+                            DebugEventToAbstractEvent(debugEvent));
+                    state = DebuggerState::Paused;
+                    return;
+                }
+
+                auto abstractEvent = DebugEventToAbstractEvent(debugEvent);
+                Notify(debugEventHandlerType, *abstractEvent);
+            }
+            catch (const std::exception& exception)
+            {
+                if (errorLogger.has_value())
+                {
+                    errorLogger.value().get().Log(exception.what());
+                }
+            }
+
+
+            if (!ContinueDebugEvent(debugEvent.dwProcessId, debugEvent.dwThreadId, DBG_CONTINUE))
+            {
+                throw std::runtime_error("Failed to continue debug event");
+            }
+        }
+    }
+
+    void Notify(DebugEventHandlerType debugEventHandlerType, const AbstractEvent& event) override
+    {
+        if (recipients.contains(debugEventHandlerType))
+        {
+            for (auto& recipient: recipients[debugEventHandlerType])
+            {
+                recipient->Handle(event);
+            }
+        }
+    }
+
+    static std::shared_ptr<AbstractEvent> DebugEventToAbstractEvent(const DEBUG_EVENT& debugEvent)
+    {
+        switch (debugEvent.dwDebugEventCode)
+        {
+            case CREATE_PROCESS_DEBUG_EVENT:
+                return std::make_shared<CreateProcessDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                                 debugEvent.u.CreateProcessInfo);
+            case CREATE_THREAD_DEBUG_EVENT:
+                return std::make_shared<CreateThreadDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                                debugEvent.u.CreateThread);
+            case EXCEPTION_DEBUG_EVENT:
+                return std::make_shared<ExceptionDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                             debugEvent.u.Exception);
+            case EXIT_PROCESS_DEBUG_EVENT:
+                return std::make_shared<ExitProcessDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                               debugEvent.u.ExitProcess);
+            case EXIT_THREAD_DEBUG_EVENT:
+                return std::make_shared<ExitThreadDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                              debugEvent.u.ExitThread);
+            case LOAD_DLL_DEBUG_EVENT:
+                return std::make_shared<LoadDllDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                           debugEvent.u.LoadDll);
+//        case OUTPUT_DEBUG_STRING_EVENT:
+//            return AbstractDebugEvent(debugEvent);
+//        case RIP_EVENT:
+//            return AbstractDebugEvent(debugEvent);
+            case UNLOAD_DLL_DEBUG_EVENT:
+                return std::make_shared<UnloadDllDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
+                                                             debugEvent.u.UnloadDll);
+            default:
+                throw std::runtime_error("Unknown debug event");
+        }
+    }
+
+    static DebugEventHandlerType DebugEventToDebugEventHandlerType(const DEBUG_EVENT& debugEvent)
+    {
+        switch (debugEvent.dwDebugEventCode)
+        {
+            case CREATE_PROCESS_DEBUG_EVENT:
+                return DebugEventHandlerType::eCreateProcess;
+            case CREATE_THREAD_DEBUG_EVENT:
+                return DebugEventHandlerType::eCreateThread;
+            case EXCEPTION_DEBUG_EVENT:
+                return DebugEventHandlerType::eException;
+            case EXIT_PROCESS_DEBUG_EVENT:
+                return DebugEventHandlerType::eExitProcess;
+            case EXIT_THREAD_DEBUG_EVENT:
+                return DebugEventHandlerType::eExitThread;
+            case LOAD_DLL_DEBUG_EVENT:
+                return DebugEventHandlerType::eLoadDll;
+//        case OUTPUT_DEBUG_STRING_EVENT:
+//            return DebugEventHandlerType::eOutputDebugString;
+//        case RIP_EVENT:
+//            return DebugEventHandlerType::eRip;
+            case UNLOAD_DLL_DEBUG_EVENT:
+                return DebugEventHandlerType::eUnloadDll;
+            default:
+                throw std::runtime_error("Unknown debug event");
+        }
+    }
+
+    [[nodiscard]] std::shared_ptr<Breakpoint> FindBreakpoint(DWORD pid, ULONG_PTR address) const
+    {
+        for (auto& breakpoint: breakpoints)
+        {
+            if (breakpoint->GetProcessId() == pid && breakpoint->GetAddress() == address)
+            {
+                return breakpoint;
+            }
+        }
+
+        return nullptr;
+    }
+
+    void SetBreakpointOnEntry()
+    {
+        AddRecipient(DebugEventHandlerType::eCreateProcess,
+                     new DefaultBreakpointOnStartHandler([this](ULONG_PTR address)
+                                                         {
+                                                             SetBreakpoint(address);
+                                                         }));
+    }
 
 public:
     Debugger& operator=(const Debugger&) = delete;
 
     Debugger(const Debugger&) = delete;
 
-    static Debugger* GetInstance();
+    static Debugger* GetInstance()
+    {
+        {
+            if (instance == nullptr)
+            {
+                instance = new Debugger();
+            }
+            return instance;
+        }
+    }
 
-    const DebuggerState& CreateAndAttach(const std::filesystem::path& pathToExecutable, bool pauseAtStart);
+    const DebuggerState& CreateAndAttach(const std::filesystem::path& pathToExecutable)
+    {
+        if (processHandle != nullptr)
+        {
+            throw std::runtime_error("Some process is already opened");
+        }
 
-    void Attach(DWORD processId);
+        CreateDebugProcess(pathToExecutable);
+        return state;
+    }
 
-    ExceptionContext WaitForDebugEvent();
+    void Attach(DWORD processId)
+    {
+        OpenProcess(processId);
+        DebugActiveProcess(GetProcessId(processHandle));
+        DebugLoop();
+    }
 
-    void SetBreakpoint(ULONG_PTR address);
+    ExceptionContext WaitForDebugEvent()
+    {
+        if (state == DebuggerState::NotStarted || state == DebuggerState::Paused)
+        {
+            if (state == DebuggerState::Paused &&
+                !ContinueDebugEvent(lastExceptionEvent->processId, lastExceptionEvent->threadId, DBG_CONTINUE))
+            {
+                throw std::runtime_error("Failed to continue debug event");
+            }
 
-    void SetErrorLogger(const Logger& logger);
+            state = DebuggerState::Running;
+
+            std::ranges::for_each(breakpoints, [](auto& breakpoint)
+            {
+                breakpoint->Enable();
+            });
+        }
+
+        DebugLoop();
+
+        bool isExternalBreakpoint = true;
+        auto breakpoint = FindBreakpoint(lastExceptionEvent->processId,
+                                         reinterpret_cast<ULONG_PTR>(lastExceptionEvent->payload
+                                                 .ExceptionRecord.ExceptionAddress));
+
+        if (breakpoint != nullptr)
+        {
+            isExternalBreakpoint = false;
+        }
+
+        std::ranges::for_each(breakpoints, [](auto& breakpoint)
+        {
+            breakpoint->Disable();
+        });
+
+        return {lastExceptionEvent, isExternalBreakpoint};
+    }
+
+    void WaitForEntry()
+    {
+        if (state != DebuggerState::NotStarted)
+        {
+            throw std::runtime_error("Can't wait for entry when debugger is already started");
+        }
+
+        SetBreakpointOnEntry();
+        while (true)
+        {
+            auto exceptionContext = WaitForDebugEvent();
+            if (exceptionContext.IsExternal())
+            {
+                continue;
+            }
+
+            UseResolver<DefaultBreakpointResolver>(exceptionContext);
+            break;
+        }
+        RemoveBreakpoint(
+                FindBreakpoint(lastExceptionEvent->processId,
+                               reinterpret_cast<ULONG_PTR>(lastExceptionEvent->payload
+                                       .ExceptionRecord.ExceptionAddress))->GetAddress()
+        );
+    }
+
+    std::shared_ptr<const Breakpoint> SetBreakpoint(ULONG_PTR address)
+    {
+        DWORD pid = GetProcessId(processHandle);
+        auto breakpoint = std::make_shared<Breakpoint>(pid, address);
+
+        breakpoints.push_back(breakpoint);
+
+        return breakpoint;
+    }
+
+    void RemoveBreakpoint(ULONG_PTR address)
+    {
+        auto breakpoint = FindBreakpoint(GetProcessId(processHandle), address);
+
+        if (breakpoint != nullptr)
+        {
+            breakpoints.remove(breakpoint);
+        }
+    }
+
+    void SetErrorLogger(const Logger& logger)
+    {
+        errorLogger = logger;
+    }
+
+    [[nodiscard]] ULONG_PTR GetLibraryAddress(const std::string& libraryName) const
+    {
+        return ansiLibraries.at(libraryName);
+    }
+
+    [[nodiscard]] ULONG_PTR GetLibrary(const std::wstring& libraryName) const
+    {
+        return unicodeLibraries.at(libraryName);
+    }
+
+    [[nodiscard]] ULONG_PTR GetProcAddress(const std::string& libraryName, const std::string& functionName) const
+    {
+        return ProcessMemoryManipulation::GetProcAddressEx(processHandle, ansiLibraries.at(libraryName),
+                                                           functionName, isWow64);
+    }
+
+    [[nodiscard]] ULONG_PTR GetProcAddress(const std::wstring& libraryName, const std::string& functionName) const
+    {
+
+        return ProcessMemoryManipulation::GetProcAddressEx(processHandle, unicodeLibraries.at(libraryName),
+                                                           functionName, isWow64);
+    }
+
+    [[nodiscard]] bool IsWow64() const
+    {
+        return isWow64;
+    }
 
     template<Derived<AbstractLoadDllDebugEventHandler> LoadDllHandler>
     void AddLoadDllHandler(const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
@@ -120,275 +442,5 @@ public:
         ExceptionHandler(logger, exceptionContext).Handle(*lastExceptionEvent);
     }
 };
-
-Debugger* Debugger::GetInstance()
-{
-    if (instance == nullptr)
-    {
-        instance = new Debugger();
-    }
-    return instance;
-}
-
-void Debugger::OpenProcess(DWORD processId)
-{
-    if (processHandle != nullptr)
-    {
-        throw std::runtime_error("Some process is already opened");
-    }
-
-    processHandle = ::OpenProcess(PROCESS_ALL_ACCESS, FALSE, processId);
-    if (processHandle == nullptr)
-    {
-        throw std::runtime_error("Failed to open process");
-    }
-}
-
-void Debugger::CreateDebugProcess(const std::filesystem::path& pathToExecutable)
-{
-    if (processHandle != nullptr)
-    {
-        throw std::runtime_error("Some process is already opened");
-    }
-
-    STARTUPINFOW startupInfo;
-    PROCESS_INFORMATION processInformation;
-
-    ZeroMemory(&processInformation, sizeof(processInformation));
-    ZeroMemory(&startupInfo, sizeof(startupInfo));
-    startupInfo.cb = sizeof(startupInfo);
-    startupInfo.dwFlags = STARTF_USESHOWWINDOW;
-    startupInfo.wShowWindow = SW_SHOWNORMAL;
-
-    // Start the child process.
-    if (!CreateProcessW(pathToExecutable.c_str(),
-                        nullptr,
-                        nullptr,
-                        nullptr,
-                        false,
-                        DEBUG_ONLY_THIS_PROCESS | CREATE_NEW_CONSOLE,
-                        nullptr,
-                        nullptr,
-                        &startupInfo,
-                        &processInformation)
-            )
-    {
-        throw std::runtime_error("CreateProcess failed (" + std::to_string(GetLastError()) + ")");
-    }
-
-    this->processHandle = processInformation.hProcess;
-
-    CloseHandle(processInformation.hThread);
-}
-
-const DebuggerState& Debugger::CreateAndAttach(const std::filesystem::path& pathToExecutable, bool pauseAtStart)
-{
-    if (processHandle != nullptr)
-    {
-        throw std::runtime_error("Some process is already opened");
-    }
-
-    if (pauseAtStart)
-    {
-        AddRecipient(DebugEventHandlerType::eCreateProcess,
-                     new DefaultBreakpointOnStartHandler([this](ULONG_PTR address)
-                                                         {
-                                                             SetBreakpoint(address);
-                                                         }));
-    }
-
-    CreateDebugProcess(pathToExecutable);
-    return state;
-}
-
-void Debugger::Attach(DWORD processId)
-{
-    OpenProcess(processId);
-    DebugActiveProcess(GetProcessId(processHandle));
-    DebugLoop();
-}
-
-void Debugger::DebugLoop()
-{
-    while (true)
-    {
-        DEBUG_EVENT debugEvent;
-        if (!::WaitForDebugEvent(&debugEvent, INFINITE))
-        {
-            break;
-        }
-
-        try
-        {
-            auto debugEventHandlerType = DebugEventToDebugEventHandlerType(debugEvent);
-
-            if (debugEventHandlerType == eException)
-            {
-                lastExceptionEvent = std::dynamic_pointer_cast<ExceptionDebugEvent>(
-                        DebugEventToAbstractEvent(debugEvent));
-                state = DebuggerState::Paused;
-                return;
-            }
-
-            auto abstractEvent = DebugEventToAbstractEvent(debugEvent);
-            Notify(debugEventHandlerType, *abstractEvent);
-        }
-        catch (const std::exception& exception)
-        {
-            if (errorLogger.has_value())
-            {
-                errorLogger.value().get().Log(exception.what());
-            }
-        }
-
-
-        if (!ContinueDebugEvent(debugEvent.dwProcessId, debugEvent.dwThreadId, DBG_CONTINUE))
-        {
-            throw std::runtime_error("Failed to continue debug event");
-        }
-    }
-}
-
-void Debugger::Notify(DebugEventHandlerType debugEventHandlerType, const AbstractEvent& event)
-{
-    if (recipients.contains(debugEventHandlerType))
-    {
-        for (auto& recipient: recipients[debugEventHandlerType])
-        {
-            recipient->Handle(event);
-        }
-    }
-}
-
-Debugger::Debugger()
-{
-    if (instance != nullptr)
-    {
-        throw std::runtime_error("Debugger is already created");
-    }
-}
-
-std::shared_ptr<AbstractEvent> Debugger::DebugEventToAbstractEvent(const DEBUG_EVENT& debugEvent)
-{
-    switch (debugEvent.dwDebugEventCode)
-    {
-        case CREATE_PROCESS_DEBUG_EVENT:
-            return std::make_shared<CreateProcessDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                             debugEvent.u.CreateProcessInfo);
-        case CREATE_THREAD_DEBUG_EVENT:
-            return std::make_shared<CreateThreadDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                            debugEvent.u.CreateThread);
-        case EXCEPTION_DEBUG_EVENT:
-            return std::make_shared<ExceptionDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                         debugEvent.u.Exception);
-        case EXIT_PROCESS_DEBUG_EVENT:
-            return std::make_shared<ExitProcessDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                           debugEvent.u.ExitProcess);
-        case EXIT_THREAD_DEBUG_EVENT:
-            return std::make_shared<ExitThreadDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                          debugEvent.u.ExitThread);
-        case LOAD_DLL_DEBUG_EVENT:
-            return std::make_shared<LoadDllDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                       debugEvent.u.LoadDll);
-//        case OUTPUT_DEBUG_STRING_EVENT:
-//            return AbstractDebugEvent(debugEvent);
-//        case RIP_EVENT:
-//            return AbstractDebugEvent(debugEvent);
-        case UNLOAD_DLL_DEBUG_EVENT:
-            return std::make_shared<UnloadDllDebugEvent>(debugEvent.dwThreadId, debugEvent.dwProcessId,
-                                                         debugEvent.u.UnloadDll);
-        default:
-            throw std::runtime_error("Unknown debug event");
-    }
-}
-
-DebugEventHandlerType Debugger::DebugEventToDebugEventHandlerType(const DEBUG_EVENT& debugEvent)
-{
-    switch (debugEvent.dwDebugEventCode)
-    {
-        case CREATE_PROCESS_DEBUG_EVENT:
-            return DebugEventHandlerType::eCreateProcess;
-        case CREATE_THREAD_DEBUG_EVENT:
-            return DebugEventHandlerType::eCreateThread;
-        case EXCEPTION_DEBUG_EVENT:
-            return DebugEventHandlerType::eException;
-        case EXIT_PROCESS_DEBUG_EVENT:
-            return DebugEventHandlerType::eExitProcess;
-        case EXIT_THREAD_DEBUG_EVENT:
-            return DebugEventHandlerType::eExitThread;
-        case LOAD_DLL_DEBUG_EVENT:
-            return DebugEventHandlerType::eLoadDll;
-//        case OUTPUT_DEBUG_STRING_EVENT:
-//            return DebugEventHandlerType::eOutputDebugString;
-//        case RIP_EVENT:
-//            return DebugEventHandlerType::eRip;
-        case UNLOAD_DLL_DEBUG_EVENT:
-            return DebugEventHandlerType::eUnloadDll;
-        default:
-            throw std::runtime_error("Unknown debug event");
-    }
-}
-
-ExceptionContext Debugger::WaitForDebugEvent()
-{
-    if (state == DebuggerState::NotStarted || state == DebuggerState::Paused)
-    {
-        if (state == DebuggerState::Paused &&
-            !ContinueDebugEvent(lastExceptionEvent->processId, lastExceptionEvent->threadId, DBG_CONTINUE))
-        {
-            throw std::runtime_error("Failed to continue debug event");
-        }
-
-        state = DebuggerState::Running;
-
-        if (lastBreakpoint)
-        {
-            lastBreakpoint->Enable();
-            lastBreakpoint.reset();
-        }
-    }
-
-    DebugLoop();
-
-    bool isExternalBreakpoint = true;
-    auto breakpoint = FindBreakpoint(lastExceptionEvent->processId,
-                                     reinterpret_cast<ULONG_PTR>(lastExceptionEvent->payload
-                                             .ExceptionRecord.ExceptionAddress));
-
-    if (breakpoint != nullptr)
-    {
-        isExternalBreakpoint = false;
-        breakpoint->Disable();
-        lastBreakpoint = breakpoint;
-    }
-
-    return {lastExceptionEvent, isExternalBreakpoint};
-}
-
-void Debugger::SetBreakpoint(ULONG_PTR address)
-{
-    DWORD pid = GetProcessId(processHandle);
-    auto breakpoint = std::make_shared<Breakpoint>(pid, address);
-
-    breakpoints.push_back(breakpoint);
-}
-
-void Debugger::SetErrorLogger(const Logger& logger)
-{
-    errorLogger = logger;
-}
-
-std::shared_ptr<Breakpoint> Debugger::FindBreakpoint(DWORD pid, ULONG_PTR address) const
-{
-    for (auto& breakpoint: breakpoints)
-    {
-        if (breakpoint->GetProcessId() == pid && breakpoint->GetAddress() == address)
-        {
-            return breakpoint;
-        }
-    }
-
-    return nullptr;
-}
 
 #endif //DEBUGGER_DEBUGGER_HPP

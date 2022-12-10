@@ -16,7 +16,7 @@ private:
 
 public:
 
-    explicit DefaultCreateThreadDebugEventHandler(std::list<std::pair<DWORD, ULONG_PTR>>& threads,
+    explicit DefaultCreateThreadDebugEventHandler(std::map<DWORD, ULONG_PTR>& threads,
                                                   std::optional<std::reference_wrapper<const Logger>> logger);
 
     ~DefaultCreateThreadDebugEventHandler() override = default;

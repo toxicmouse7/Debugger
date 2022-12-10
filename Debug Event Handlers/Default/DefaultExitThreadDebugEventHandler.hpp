@@ -15,7 +15,7 @@ private:
     void LogExitThread(DWORD pid, DWORD tid, DWORD exitCode) const override;
 
 public:
-    explicit DefaultExitThreadDebugEventHandler(std::list<std::pair<DWORD, ULONG_PTR>>& threads,
+    explicit DefaultExitThreadDebugEventHandler(std::map<DWORD, ULONG_PTR>& threads,
                                                 std::optional<std::reference_wrapper<const Logger>> logger)
                                                 : AbstractExitThreadDebugEventHandler(threads, logger) {}
 

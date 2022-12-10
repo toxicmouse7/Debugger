@@ -19,7 +19,7 @@ private:
 public:
     explicit Breakpoint(DWORD pid, ULONG_PTR address);
 
-    ~Breakpoint() = default;
+    ~Breakpoint();
 
     [[nodiscard]] unsigned __int64 GetAddress() const;
 
@@ -30,6 +30,8 @@ public:
     void Enable();
 
     void Disable();
+
+    bool operator==(ULONG_PTR lookupAddress) const;
 };
 
 #endif //DEBUGGER_BREAKPOINT_HPP

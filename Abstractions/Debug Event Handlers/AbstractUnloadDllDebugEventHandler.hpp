@@ -17,8 +17,8 @@
 class AbstractUnloadDllDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    std::list<std::pair<std::string, ULONG_PTR>>& ansiLibraries;
-    std::list<std::pair<std::wstring, ULONG_PTR>>& unicodeLibraries;
+    std::map<std::string, ULONG_PTR>& ansiLibraries;
+    std::map<std::wstring, ULONG_PTR>& unicodeLibraries;
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -40,7 +40,7 @@ protected:
 
     [[nodiscard]] std::optional<std::reference_wrapper<const std::string>> FindAnsiLibrary(ULONG_PTR address) const
     {
-        for (const auto& library: ansiLibraries)
+        for (const auto& library : ansiLibraries)
         {
             if (library.second == address)
                 return library.first;
@@ -62,23 +62,17 @@ protected:
 
     void RemoveLibrary(const std::string& libraryName)
     {
-        ansiLibraries.remove_if([libraryName](const auto& library)
-                                {
-                                    return library.first == libraryName;
-                                });
+        ansiLibraries.erase(libraryName);
     }
 
     void RemoveLibrary(const std::wstring& libraryName)
     {
-        unicodeLibraries.remove_if([libraryName](const auto& library)
-                                   {
-                                       return library.first == libraryName;
-                                   });
+        unicodeLibraries.erase(libraryName);
     }
 
 public:
-    explicit AbstractUnloadDllDebugEventHandler(std::list<std::pair<std::string, ULONG_PTR>>& ansiLibraries,
-                                                std::list<std::pair<std::wstring, ULONG_PTR>>& unicodeLibraries,
+    explicit AbstractUnloadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
+                                                std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
                                                 std::optional<std::reference_wrapper<const Logger>> logger)
             : ansiLibraries(ansiLibraries), unicodeLibraries(unicodeLibraries)
     {

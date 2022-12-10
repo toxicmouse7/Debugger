@@ -22,7 +22,7 @@ void DefaultCreateThreadDebugEventHandler::LogCreateThread(DWORD tid, ULONG_PTR 
 }
 
 DefaultCreateThreadDebugEventHandler::DefaultCreateThreadDebugEventHandler(
-        std::list<std::pair<DWORD, ULONG_PTR>>& threads, std::optional<std::reference_wrapper<const Logger>> logger)
+        std::map<DWORD, ULONG_PTR>& threads, std::optional<std::reference_wrapper<const Logger>> logger)
         : AbstractCreateThreadDebugEventHandler(threads, logger)
 {
 

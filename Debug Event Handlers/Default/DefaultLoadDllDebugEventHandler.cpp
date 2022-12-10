@@ -10,14 +10,14 @@ void DefaultLoadDllDebugEventHandler::HandleDebugEvent(const LoadDllDebugEvent& 
     if (event.payload.lpImageName != nullptr)
     {
         ULONG_PTR pImageName = ProcessMemoryManipulation::ReadPointer(
-                event.processId, reinterpret_cast<ULONG_PTR>(event.payload.lpImageName)
-        );
+                event.processId, reinterpret_cast<ULONG_PTR>(event.payload.lpImageName));
 
         if (event.payload.fUnicode == 0)
         {
             auto dllName = Utils::Split(ProcessMemoryManipulation::ReadString(
                     event.processId, pImageName
             ), "\\").back();
+            std::ranges::transform(dllName, dllName.begin(), [] (auto c) { return std::tolower(c); });
             LogLibraryLoad(dllName, reinterpret_cast<ULONG_PTR>(event.payload.lpBaseOfDll));
             AddLibrary(dllName, reinterpret_cast<ULONG_PTR>(event.payload.lpBaseOfDll));
         }
@@ -26,6 +26,7 @@ void DefaultLoadDllDebugEventHandler::HandleDebugEvent(const LoadDllDebugEvent& 
             auto dllName = Utils::Split(ProcessMemoryManipulation::ReadWString(
                     event.processId, pImageName
             ), L"\\").back();
+            std::ranges::transform(dllName, dllName.begin(), [] (auto c) { return std::tolower(c); });
             LogLibraryLoad(dllName, reinterpret_cast<ULONG_PTR>(event.payload.lpBaseOfDll));
             AddLibrary(dllName, reinterpret_cast<ULONG_PTR>(event.payload.lpBaseOfDll));
         }
@@ -37,8 +38,8 @@ void DefaultLoadDllDebugEventHandler::HandleDebugEvent(const LoadDllDebugEvent& 
 }
 
 DefaultLoadDllDebugEventHandler::DefaultLoadDllDebugEventHandler(
-        std::list<std::pair<std::string, ULONG_PTR>>& ansiLibraries,
-        std::list<std::pair<std::wstring, ULONG_PTR>>& unicodeLibraries,
+        std::map<std::string, ULONG_PTR>& ansiLibraries,
+        std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
         std::optional<std::reference_wrapper<const Logger>> logger) :
         AbstractLoadDllDebugEventHandler(ansiLibraries, unicodeLibraries, logger)
 {

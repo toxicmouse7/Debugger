@@ -2,13 +2,13 @@
 // Created by Aleksej on 04.12.2022.
 //
 
-#ifndef DEBUGGER_TRACEDEBUGEVENTHANDLER_HPP
-#define DEBUGGER_TRACEDEBUGEVENTHANDLER_HPP
+#ifndef DEBUGGER_TRACERESOLVER_HPP
+#define DEBUGGER_TRACERESOLVER_HPP
 
 #include "Abstractions/Debug Event Handlers/AbstractExceptionDebugEventHandler.hpp"
 #include "Zydis/Disassembler.h"
 
-class TraceDebugEventHandler : public AbstractExceptionDebugEventHandler
+class TraceResolver : public AbstractExceptionDebugEventHandler
 {
 private:
     void HandleDebugEvent(const ExceptionDebugEvent& event) override;
@@ -20,12 +20,12 @@ private:
                         const CONTEXT& context, bool isWow64);
 
 public:
-    explicit TraceDebugEventHandler(std::optional<std::reference_wrapper<const Logger>> logger,
-                                    const ExceptionContext& exceptionContext)
+    explicit TraceResolver(std::optional<std::reference_wrapper<const Logger>> logger,
+                           const ExceptionContext& exceptionContext)
             : AbstractExceptionDebugEventHandler(logger, exceptionContext) {}
 
-    ~TraceDebugEventHandler() override = default;
+    ~TraceResolver() override = default;
 };
 
 
-#endif //DEBUGGER_TRACEDEBUGEVENTHANDLER_HPP
+#endif //DEBUGGER_TRACERESOLVER_HPP

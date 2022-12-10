@@ -2,13 +2,13 @@
 // Created by Aleksej on 04.12.2022.
 //
 
-#include "TraceDebugEventHandler.hpp"
+#include "TraceResolver.hpp"
 #include "Process Memory Manipulation/ProcessMemoryManipulation.hpp"
 #include "Utils/Utils.hpp"
 
 #include <Zydis/Zydis.h>
 
-void TraceDebugEventHandler::HandleDebugEvent(const ExceptionDebugEvent& event)
+void TraceResolver::HandleDebugEvent(const ExceptionDebugEvent& event)
 {
     auto thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, event.threadId);
     if (thread == INVALID_HANDLE_VALUE)
@@ -31,7 +31,7 @@ void TraceDebugEventHandler::HandleDebugEvent(const ExceptionDebugEvent& event)
     IsWow64Process(process, &isWow64);
 
     ZydisDisassembledInstruction instruction;
-    Utils::DisassembleInstruction(event.processId, context, isWow64, &instruction);
+    Utils::DisassembleInstruction(event.processId, context.Rip, isWow64, &instruction);
 
     if (instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP || instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL)
     {
@@ -49,15 +49,15 @@ void TraceDebugEventHandler::HandleDebugEvent(const ExceptionDebugEvent& event)
     CloseHandle(thread);
 }
 
-void TraceDebugEventHandler::LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
-                                          ULONG_PTR exceptionAddress) const
+void TraceResolver::LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
+                                 ULONG_PTR exceptionAddress) const
 {
 
 }
 
-void TraceDebugEventHandler::LogInstruction(ULONG_PTR instructionAddress,
-                                            const ZydisDisassembledInstruction& instruction,
-                                            const CONTEXT& context, bool isWow64)
+void TraceResolver::LogInstruction(ULONG_PTR instructionAddress,
+                                   const ZydisDisassembledInstruction& instruction,
+                                   const CONTEXT& context, bool isWow64)
 {
     if (GetLogger().has_value())
     {

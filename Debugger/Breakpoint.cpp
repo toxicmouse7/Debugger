@@ -43,3 +43,16 @@ void Breakpoint::Enable()
         isEnabled = true;
     }
 }
+
+bool Breakpoint::operator==(ULONG_PTR lookupAddress) const
+{
+    return this->address == lookupAddress;
+}
+
+Breakpoint::~Breakpoint()
+{
+    if (isEnabled)
+    {
+        Disable();
+    }
+}

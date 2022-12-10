@@ -11,8 +11,6 @@ void DefaultExceptionDebugEventHandler::HandleDebugEvent(const ExceptionDebugEve
     LogException(event.processId, ExceptionCodeToString(event.payload.ExceptionRecord.ExceptionCode),
                  event.payload.ExceptionRecord.ExceptionCode,
                  reinterpret_cast<ULONG_PTR>(event.payload.ExceptionRecord.ExceptionAddress));
-
-
 }
 
 void DefaultExceptionDebugEventHandler::LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,

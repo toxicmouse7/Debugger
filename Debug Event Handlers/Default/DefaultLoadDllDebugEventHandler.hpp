@@ -19,8 +19,8 @@ private:
 
 public:
 
-    DefaultLoadDllDebugEventHandler(std::list<std::pair<std::string, ULONG_PTR>>& ansiLibraries,
-                                    std::list<std::pair<std::wstring, ULONG_PTR>>& unicodeLibraries,
+    DefaultLoadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
+                                    std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
                                     std::optional<std::reference_wrapper<const Logger>> logger);
 
     ~DefaultLoadDllDebugEventHandler() override = default;

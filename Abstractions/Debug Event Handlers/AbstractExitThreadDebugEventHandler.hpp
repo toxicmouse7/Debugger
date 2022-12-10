@@ -17,7 +17,7 @@
 class AbstractExitThreadDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    std::list<std::pair<DWORD, ULONG_PTR>>& threads;
+    std::map<DWORD, ULONG_PTR>& threads;
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -37,11 +37,11 @@ protected:
 
     void RemoveThread(DWORD tid)
     {
-        threads.remove_if([tid](const auto& thread) { return thread.first == tid; });
+        threads.erase(tid);
     }
 
 public:
-    explicit AbstractExitThreadDebugEventHandler(std::list<std::pair<DWORD, ULONG_PTR>>& threads,
+    explicit AbstractExitThreadDebugEventHandler(std::map<DWORD, ULONG_PTR>& threads,
                                                  std::optional<std::reference_wrapper<const Logger>> logger)
                                                  : threads(threads)
     {

@@ -12,8 +12,7 @@ void DefaultCreateProcessDebugEventHandler::HandleDebugEvent(const CreateProcess
     if (event.payload.lpImageName != nullptr)
     {
         auto pImageName = ProcessMemoryManipulation::ReadPointer(
-                event.processId, reinterpret_cast<ULONG_PTR>(event.payload.lpImageName)
-        );
+                event.processId, reinterpret_cast<ULONG_PTR>(event.payload.lpImageName));
 
         if (event.payload.fUnicode == 0)
         {

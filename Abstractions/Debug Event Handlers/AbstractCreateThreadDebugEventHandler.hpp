@@ -16,7 +16,7 @@
 class AbstractCreateThreadDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    std::list<std::pair<DWORD, ULONG_PTR>>& threads;
+    std::map<DWORD, ULONG_PTR>& threads;
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -36,11 +36,11 @@ protected:
 
     void AddThread(DWORD tid, ULONG_PTR startAddress)
     {
-        threads.emplace_back(tid, startAddress);
+        threads[tid] = startAddress;
     }
 
 public:
-    explicit AbstractCreateThreadDebugEventHandler(std::list<std::pair<DWORD, ULONG_PTR>>& threads,
+    explicit AbstractCreateThreadDebugEventHandler(std::map<DWORD, ULONG_PTR>& threads,
                                                    std::optional<std::reference_wrapper<const Logger>> logger)
                                                    : threads(threads)
     {

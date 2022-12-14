@@ -21,10 +21,10 @@ private:
     void LogException(DWORD pid, const std::string& exceptionName, DWORD exceptionCode,
                       ULONG_PTR exceptionAddress) const override;
 
-    void LogFunctionCall(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR callAddress, ULONG_PTR stackAddress,
+    void LogFunctionCall(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR callAddress, const CONTEXT& context,
                          bool isWow64) const;
 
-    static std::wstring ParseArgs(DWORD pid, const ArgInfo& argInfo, bool isWow64, ULONG_PTR stackAddress);
+    static std::wstring ParseArgs(DWORD pid, const ArgInfo& argInfo, const CONTEXT& context, bool isWow64);
 
     static std::wstring ParseStructure(DWORD pid, std::string structureName, bool isWow64, ULONG_PTR structureAddress,
                                        uint32_t nestingLevel);
@@ -33,8 +33,7 @@ private:
 
     static void AddNesting(std::wstringstream& ss, uint32_t nesting);
 
-    void LogFunctionReturn(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR stackAddress, bool isWow64,
-                           ULONG_PTR returnValue) const;
+    void LogFunctionReturn(DWORD pid, ULONG_PTR functionAddress, const CONTEXT& context, bool isWow64) const;
 
 public:
     explicit DumpFunction(std::optional<std::reference_wrapper<const Logger>> logger,

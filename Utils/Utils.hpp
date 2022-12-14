@@ -47,6 +47,8 @@ public:
 
     static bool IsWow64(DWORD processId);
 
+    static ULONG_PTR GetValueFromRegister(CONTEXT context, ZydisRegister aRegister);
+
 private:
     static bool IsConditionalJumpInstruction(const ZydisDisassembledInstruction& instruction);
 
@@ -60,6 +62,10 @@ private:
                                      const std::shared_ptr<std::map<uint64_t, std::set<uint64_t>>>& adjacencyList);
 
     static ULONG_PTR GetJumpOffsetFromInstruction(DWORD processId, const ZydisDisassembledInstruction& instruction);
+
+    static std::shared_ptr<std::set<uint64_t>>
+    GetArgumentsFromAdjacencyList(DWORD processId, bool isWow64,
+                                  const std::shared_ptr<std::map<uint64_t, std::set<uint64_t>>>& adjacencyList);
 };
 
 

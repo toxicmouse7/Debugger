@@ -29,16 +29,10 @@ void DumpFunction::HandleDebugEvent(const ExceptionDebugEvent& event)
     CloseHandle(process);
 
     ULONG_PTR callAddress = 0;
-    if (isWow64)
-    {
-        ProcessMemoryManipulation::ReadBytes(event.processId, context.Rsp, reinterpret_cast<BYTE*>(&callAddress),
-                                             sizeof(ULONG));
-    }
-    else
-    {
-        ProcessMemoryManipulation::ReadBytes(event.processId, context.Rsp, reinterpret_cast<BYTE*>(&callAddress),
-                                             sizeof(ULONG_PTR));
-    }
+    auto ptrSize = isWow64 ? 4 : 8;
+
+    ProcessMemoryManipulation::ReadBytes(event.processId, context.Rsp, reinterpret_cast<BYTE*>(&callAddress),
+                                         ptrSize);
 
     context.Dr6 = 0;
 
@@ -57,7 +51,7 @@ void DumpFunction::HandleDebugEvent(const ExceptionDebugEvent& event)
             debugger->RemoveBreakpoint(address);
         });
         retBreakpoints.reset();
-        LogFunctionReturn(event.processId, lastAddress, context.Rsp, isWow64, context.Rax);
+        LogFunctionReturn(event.processId, lastAddress, context, isWow64);
         return;
     }
 
@@ -69,7 +63,7 @@ void DumpFunction::HandleDebugEvent(const ExceptionDebugEvent& event)
     });
     //debugger->SetBreakpoint(function->back().runtime_address);
 
-    LogFunctionCall(event.processId, context.Rip, callAddress, context.Rsp, isWow64);
+    LogFunctionCall(event.processId, context.Rip, callAddress, context, isWow64);
     lastAddress = context.Rip;
 }
 
@@ -79,7 +73,7 @@ void DumpFunction::LogException(DWORD pid, const std::string& exceptionName, DWO
 
 }
 
-void DumpFunction::LogFunctionCall(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR callAddress, ULONG_PTR stackAddress,
+void DumpFunction::LogFunctionCall(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR callAddress, const CONTEXT& context,
                                    bool isWow64) const
 {
     auto functionsDatabase = FunctionsDatabase::GetInstance();
@@ -90,28 +84,37 @@ void DumpFunction::LogFunctionCall(DWORD pid, ULONG_PTR functionAddress, ULONG_P
         ss << std::hex << Utils::FormatAddress(callAddress, "'").c_str() << std::endl;
 
         auto argInfo = functionsDatabase->GetFunctionArgs(functionsDatabase->GetFunctionName(functionAddress));
-        ss << ParseArgs(pid, argInfo, isWow64, stackAddress);
+        ss << ParseArgs(pid, argInfo, context, isWow64);
 
         GetLogger().value().get().Log(ss.str());
     }
 }
 
-std::wstring DumpFunction::ParseArgs(DWORD pid, const ArgInfo& argInfo, bool isWow64, ULONG_PTR stackAddress)
+std::wstring DumpFunction::ParseArgs(DWORD pid, const ArgInfo& argInfo, const CONTEXT& context, bool isWow64)
 {
     std::wstringstream ss;
+    const std::vector<DWORD64> registerArgs = {context.Rcx, context.Rdx, context.R8, context.R9};
 
     for (int i = 0; i < argInfo.count; i++)
     {
         ULONG_PTR argValue = 0;
         if (isWow64)
         {
-            ProcessMemoryManipulation::ReadBytes(pid, stackAddress + 4 + i * 4, reinterpret_cast<BYTE*>(&argValue),
+            ProcessMemoryManipulation::ReadBytes(pid, context.Rsp + 4 + i * 4, reinterpret_cast<BYTE*>(&argValue),
                                                  sizeof(ULONG));
         }
         else
         {
-            ProcessMemoryManipulation::ReadBytes(pid, stackAddress + 8 + i * 8, reinterpret_cast<BYTE*>(&argValue),
-                                                 sizeof(ULONG_PTR));
+            if (i < 4)
+            {
+                argValue = registerArgs[i];
+            }
+            else
+            {
+                ProcessMemoryManipulation::ReadBytes(pid, context.Rsp + 8 + (i - 4) * 8,
+                                                     reinterpret_cast<BYTE*>(&argValue),
+                                                     sizeof(ULONG_PTR));
+            }
         }
 
         ss << argInfo.names[i].c_str() << ' ' << argInfo.values[i].c_str() << ": ";
@@ -287,17 +290,16 @@ void DumpFunction::AddNesting(std::wstringstream& ss, uint32_t nesting)
     }
 }
 
-void DumpFunction::LogFunctionReturn(DWORD pid, ULONG_PTR functionAddress, ULONG_PTR stackAddress, bool isWow64,
-                                     ULONG_PTR returnValue) const
+void DumpFunction::LogFunctionReturn(DWORD pid, ULONG_PTR functionAddress, const CONTEXT& context, bool isWow64) const
 {
     auto functionsDatabase = FunctionsDatabase::GetInstance();
     if (GetLogger().has_value())
     {
         std::wstringstream ss;
-        ss << "Return value: " << Utils::FormatAddress(returnValue, "'").c_str() << std::endl;
+        ss << "Return value: " << Utils::FormatAddress(context.Rax, "'").c_str() << std::endl;
 
         auto argInfo = functionsDatabase->GetFunctionArgs(functionsDatabase->GetFunctionName(functionAddress));
-        ss << ParseArgs(pid, argInfo, isWow64, stackAddress);
+        ss << ParseArgs(pid, argInfo, context, isWow64);
 
         GetLogger().value().get().Log(ss.str());
     }

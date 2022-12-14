@@ -248,6 +248,31 @@ private:
                                                          }));
     }
 
+    void SetTraceFlag()
+    {
+        auto thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, lastExceptionEvent->threadId);
+        if (thread == nullptr)
+        {
+            throw std::runtime_error("Failed to open thread");
+        }
+
+        CONTEXT context;
+        context.ContextFlags = CONTEXT_ALL;
+        if (!GetThreadContext(thread, &context))
+        {
+            throw std::runtime_error("Failed to get thread context");
+        }
+
+        context.EFlags |= 0x100;
+
+        if (!SetThreadContext(thread, &context))
+        {
+            throw std::runtime_error("Failed to set thread context");
+        }
+
+        CloseHandle(thread);
+    }
+
 public:
     Debugger& operator=(const Debugger&) = delete;
 
@@ -320,7 +345,7 @@ public:
         return {lastExceptionEvent, isExternalBreakpoint};
     }
 
-    void WaitForEntry()
+    void WaitForEntry(bool trace)
     {
         if (state != DebuggerState::NotStarted)
         {
@@ -337,6 +362,11 @@ public:
             }
 
             UseResolver<DefaultBreakpointResolver>(exceptionContext);
+            if (trace)
+            {
+                SetTraceFlag();
+            }
+
             break;
         }
         RemoveBreakpoint(
@@ -376,7 +406,7 @@ public:
         return ansiLibraries.at(libraryName);
     }
 
-    [[nodiscard]] ULONG_PTR GetLibrary(const std::wstring& libraryName) const
+    [[nodiscard]] ULONG_PTR GetLibraryAddress(const std::wstring& libraryName) const
     {
         return unicodeLibraries.at(libraryName);
     }

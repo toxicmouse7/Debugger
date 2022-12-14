@@ -137,7 +137,9 @@ Function Utils::DisassembleFunction(DWORD processId, ULONG_PTR address, bool isW
 
     auto instructions = GetInstructionsFromAdjacencyList(processId, isWow64, adjacencyList);
 
-    return {adjacencyList, instructions};
+    auto argumentsStackOffset = GetArgumentsFromAdjacencyList(processId, isWow64, adjacencyList);
+
+    return {adjacencyList, instructions, argumentsStackOffset};
 }
 
 std::shared_ptr<std::map<uint64_t, std::vector<ZydisDisassembledInstruction>>>
@@ -153,6 +155,7 @@ Utils::GetInstructionsFromAdjacencyList(DWORD processId, bool isWow64,
         {
             ZydisDisassembledInstruction instruction;
             DisassembleInstruction(processId, pieceEntry, isWow64, &instruction);
+
             (*instructions)[adjacencyEntry.first].push_back(instruction);
             pieceEntry += instruction.info.length;
 
@@ -178,8 +181,8 @@ Utils::GetInstructionsFromAdjacencyList(DWORD processId, bool isWow64,
     return instructions;
 }
 
-std::shared_ptr<std::map<uint64_t, std::set<uint64_t>>>
-Utils::GetAdjacencyList(DWORD processId, ULONG_PTR address, bool isWow64)
+std::shared_ptr<std::map<uint64_t, std::set<uint64_t>>> Utils::GetAdjacencyList(DWORD processId, ULONG_PTR address,
+                                                                                bool isWow64)
 {
     auto adjacency = std::make_shared<std::map<uint64_t, std::set<uint64_t>>>();
     std::stack<uint64_t> toVisit;
@@ -289,4 +292,130 @@ bool Utils::IsWow64(DWORD processId)
     }
     CloseHandle(process);
     return isWow64;
+}
+
+ULONG_PTR Utils::GetValueFromRegister(CONTEXT context, ZydisRegister aRegister)
+{
+    switch (aRegister)
+    {
+        case ZYDIS_REGISTER_RAX:
+        case ZYDIS_REGISTER_EAX:
+            return context.Rax;
+        case ZYDIS_REGISTER_RCX:
+        case ZYDIS_REGISTER_ECX:
+            return context.Rcx;
+        case ZYDIS_REGISTER_RDX:
+        case ZYDIS_REGISTER_EDX:
+            return context.Rdx;
+        case ZYDIS_REGISTER_RBX:
+        case ZYDIS_REGISTER_EBX:
+            return context.Rbx;
+        case ZYDIS_REGISTER_RSP:
+        case ZYDIS_REGISTER_ESP:
+            return context.Rsp;
+        case ZYDIS_REGISTER_RBP:
+        case ZYDIS_REGISTER_EBP:
+            return context.Rbp;
+        case ZYDIS_REGISTER_RSI:
+        case ZYDIS_REGISTER_ESI:
+            return context.Rsi;
+        case ZYDIS_REGISTER_RDI:
+        case ZYDIS_REGISTER_EDI:
+            return context.Rdi;
+        case ZYDIS_REGISTER_R8:
+        case ZYDIS_REGISTER_R8D:
+            return context.R8;
+        case ZYDIS_REGISTER_R9:
+        case ZYDIS_REGISTER_R9D:
+            return context.R9;
+        case ZYDIS_REGISTER_R10:
+        case ZYDIS_REGISTER_R10D:
+            return context.R10;
+        case ZYDIS_REGISTER_R11:
+        case ZYDIS_REGISTER_R11D:
+            return context.R11;
+        case ZYDIS_REGISTER_R12:
+        case ZYDIS_REGISTER_R12D:
+            return context.R12;
+        case ZYDIS_REGISTER_R13:
+        case ZYDIS_REGISTER_R13D:
+            return context.R13;
+        case ZYDIS_REGISTER_R14:
+        case ZYDIS_REGISTER_R14D:
+            return context.R14;
+        case ZYDIS_REGISTER_R15:
+        case ZYDIS_REGISTER_R15D:
+            return context.R15;
+        case ZYDIS_REGISTER_RIP:
+        case ZYDIS_REGISTER_EIP:
+            return context.Rip;
+        case ZYDIS_REGISTER_RFLAGS:
+        case ZYDIS_REGISTER_EFLAGS:
+            return context.EFlags;
+        case ZYDIS_REGISTER_CS:
+            return context.SegCs;
+        case ZYDIS_REGISTER_SS:
+            return context.SegSs;
+        case ZYDIS_REGISTER_DS:
+            return context.SegDs;
+        case ZYDIS_REGISTER_ES:
+            return context.SegEs;
+        case ZYDIS_REGISTER_FS:
+            return context.SegFs;
+        case ZYDIS_REGISTER_GS:
+            return context.SegGs;
+        default:
+            throw std::runtime_error("Unknown register " + std::to_string(aRegister));
+    }
+}
+
+std::shared_ptr<std::set<uint64_t>>
+Utils::GetArgumentsFromAdjacencyList(DWORD processId, bool isWow64,
+                                     const std::shared_ptr<std::map<uint64_t, std::set<uint64_t>>>& adjacencyList)
+{
+    auto arguments = std::make_shared<std::set<uint64_t>>();
+
+    auto checkIfArgumentAccessed = [](const ZydisDecodedOperand& operand)
+    {
+        if (operand.type == ZYDIS_OPERAND_TYPE_MEMORY)
+        {
+            if (operand.mem.base == ZYDIS_REGISTER_RBP || operand.mem.base == ZYDIS_REGISTER_EBP ||
+                operand.mem.base == ZYDIS_REGISTER_RSP || operand.mem.base == ZYDIS_REGISTER_ESP)
+            {
+                if (operand.mem.disp.value > 0) return true;
+            }
+        }
+
+        return false;
+    };
+
+    for (auto& adjacencyEntry: *adjacencyList)
+    {
+        auto pieceEntry = adjacencyEntry.first;
+        while (true)
+        {
+            ZydisDisassembledInstruction instruction;
+            DisassembleInstruction(processId, pieceEntry, isWow64, &instruction);
+
+            if (checkIfArgumentAccessed(instruction.operands[0]))
+            {
+                arguments->insert(instruction.operands[0].mem.disp.value);
+            }
+            else if (checkIfArgumentAccessed(instruction.operands[1]))
+            {
+                arguments->insert(instruction.operands[1].mem.disp.value);
+            }
+
+            pieceEntry += instruction.info.length;
+
+            if (IsJumpInstruction(instruction) || IsConditionalJumpInstruction(instruction) ||
+                adjacencyList->contains(pieceEntry) ||
+                instruction.info.mnemonic == ZYDIS_MNEMONIC_RET)
+            {
+                break;
+            }
+        }
+    }
+
+    return arguments;
 }

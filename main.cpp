@@ -7,6 +7,7 @@
 #include "Debug Event Handlers/Dump Function Resolver/FunctionsDatabase.hpp"
 #include "Debug Event Handlers/Dump Function Resolver/StructuresDatabase.hpp"
 #include "Debug Event Handlers/Dump Function Resolver/BitfieldsDatabase.hpp"
+#include "Debug Event Handlers/Trace Functions Resolver/TraceFunctionsResolver.hpp"
 
 void AddFunctionsToDatabase(bool isWow64)
 {
@@ -181,15 +182,32 @@ int main()
     auto& debuggerState = debugger->CreateAndAttach(
             R"(C:\Users\Aleksej\CLionProjects\test123\cmake-build-debug-x86\test.exe)");
 
-    debugger->WaitForEntry();
+//    debugger->WaitForEntry(false);
+//
+////    AddFunctionsToDatabase(debugger->IsWow64());
+////    AddStructuresToDatabase(debugger->IsWow64());
+////    AddBitfieldsToDatabase();
+//
+////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernelbase.dll", "ExitProcess"));
+////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "CreateProcessA"));
+////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "TerminateProcess"));
+//
+//    while (debuggerState != DebuggerState::Stopped)
+//    {
+//        auto exceptionContext = debugger->WaitForDebugEvent();
+//
+//        if (exceptionContext.IsExternal() && exceptionContext.Type() != ExceptionContextType::eHardBreakpoint)
+//        {
+//            debugger->UseResolver<DefaultExceptionDebugEventHandler>(exceptionContext, logger);
+//        }
+//        else
+//        {
+////            debugger->UseResolver<TraceResolver>(exceptionContext, logger);
+//            debugger->UseResolver<DumpFunction>(exceptionContext, logger);
+//        }
+//    }
 
-    AddFunctionsToDatabase(debugger->IsWow64());
-    AddStructuresToDatabase(debugger->IsWow64());
-    AddBitfieldsToDatabase();
-
-//    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernelbase.dll", "ExitProcess"));
-    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "CreateProcessA"));
-    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "TerminateProcess"));
+    debugger->WaitForEntry(true);
 
     while (debuggerState != DebuggerState::Stopped)
     {
@@ -199,10 +217,9 @@ int main()
         {
             debugger->UseResolver<DefaultExceptionDebugEventHandler>(exceptionContext, logger);
         }
-        else //if (exceptionContext.Type() == ExceptionContextType::eHardBreakpoint)
+        else
         {
-//            debugger->UseResolver<TraceResolver>(exceptionContext, logger);
-            debugger->UseResolver<DumpFunction>(exceptionContext, logger);
+            debugger->UseResolver<TraceFunctionsResolver>(exceptionContext, logger);
         }
     }
 

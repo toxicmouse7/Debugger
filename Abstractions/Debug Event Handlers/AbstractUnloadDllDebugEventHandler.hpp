@@ -17,8 +17,7 @@
 class AbstractUnloadDllDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    std::map<std::string, ULONG_PTR>& ansiLibraries;
-    std::map<std::wstring, ULONG_PTR>& unicodeLibraries;
+    std::map<std::wstring, ULONG_PTR>& libraries;
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -34,47 +33,28 @@ protected:
 
     virtual void HandleDebugEvent(const UnloadDllDebugEvent& event) = 0;
 
-    virtual void LogUnloadDll(const std::string& libraryName, ULONG_PTR baseAddress) const = 0;
-
     virtual void LogUnloadDll(const std::wstring& libraryName, ULONG_PTR baseAddress) const = 0;
 
-    [[nodiscard]] std::optional<std::reference_wrapper<const std::string>> FindAnsiLibrary(ULONG_PTR address) const
+    [[nodiscard]] std::optional<std::reference_wrapper<const std::wstring>> FindLibrary(ULONG_PTR address) const
     {
-        for (const auto& library : ansiLibraries)
+        for (const auto& library: libraries)
         {
             if (library.second == address)
                 return library.first;
         }
 
         return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<std::reference_wrapper<const std::wstring>> FindUnicodeLibrary(ULONG_PTR address) const
-    {
-        for (const auto& library: unicodeLibraries)
-        {
-            if (library.second == address)
-                return library.first;
-        }
-
-        return std::nullopt;
-    }
-
-    void RemoveLibrary(const std::string& libraryName)
-    {
-        ansiLibraries.erase(libraryName);
     }
 
     void RemoveLibrary(const std::wstring& libraryName)
     {
-        unicodeLibraries.erase(libraryName);
+        libraries.erase(libraryName);
     }
 
 public:
-    explicit AbstractUnloadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
-                                                std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
+    explicit AbstractUnloadDllDebugEventHandler(std::map<std::wstring, ULONG_PTR>& libraries,
                                                 std::optional<std::reference_wrapper<const Logger>> logger)
-            : ansiLibraries(ansiLibraries), unicodeLibraries(unicodeLibraries)
+            : libraries(libraries)
     {
         if (logger.has_value())
             SetLogger(logger.value());

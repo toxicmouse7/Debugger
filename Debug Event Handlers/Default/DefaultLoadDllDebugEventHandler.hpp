@@ -13,14 +13,11 @@ class DefaultLoadDllDebugEventHandler : public AbstractLoadDllDebugEventHandler
 private:
     void HandleDebugEvent(const LoadDllDebugEvent& event) override;
 
-    void LogLibraryLoad(const std::string& libraryName, ULONG_PTR baseAddress) const override;
-
     void LogLibraryLoad(const std::wstring& libraryName, ULONG_PTR baseAddress) const override;
 
 public:
 
-    DefaultLoadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
-                                    std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
+    DefaultLoadDllDebugEventHandler(std::map<std::wstring, ULONG_PTR>& libraries,
                                     std::optional<std::reference_wrapper<const Logger>> logger);
 
     ~DefaultLoadDllDebugEventHandler() override = default;

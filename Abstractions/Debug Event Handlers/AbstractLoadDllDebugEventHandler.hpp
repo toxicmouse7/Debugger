@@ -17,8 +17,7 @@
 class AbstractLoadDllDebugEventHandler : public AbstractEventRecipient
 {
 private:
-    std::map<std::string, ULONG_PTR>& ansiLibraries;
-    std::map<std::wstring, ULONG_PTR>& unicodeLibraries;
+    std::map<std::wstring, ULONG_PTR>& libraries;
     std::optional<std::reference_wrapper<const Logger>> logger;
 
     void SetLogger(std::reference_wrapper<const Logger> loggerReference)
@@ -34,26 +33,17 @@ protected:
 
     virtual void HandleDebugEvent(const LoadDllDebugEvent& event) = 0;
 
-    virtual void LogLibraryLoad(const std::string& libraryName, ULONG_PTR baseAddress) const = 0;
-
     virtual void LogLibraryLoad(const std::wstring& libraryName, ULONG_PTR baseAddress) const = 0;
-
-    void AddLibrary(const std::string& libraryName, ULONG_PTR baseAddress)
-    {
-        ansiLibraries[libraryName] = baseAddress;
-    }
 
     void AddLibrary(const std::wstring& libraryName, ULONG_PTR baseAddress)
     {
-        unicodeLibraries[libraryName] = baseAddress;
+        libraries[libraryName] = baseAddress;
     }
 
 public:
-    explicit AbstractLoadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
-                                              std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
+    explicit AbstractLoadDllDebugEventHandler(std::map<std::wstring, ULONG_PTR>& libraries,
                                               std::optional<std::reference_wrapper<const Logger>> logger)
-            : ansiLibraries(ansiLibraries),
-              unicodeLibraries(unicodeLibraries)
+            : libraries(libraries)
     {
         if (logger.has_value())
             SetLogger(logger.value());

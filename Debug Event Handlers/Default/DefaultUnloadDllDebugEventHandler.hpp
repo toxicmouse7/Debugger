@@ -12,15 +12,12 @@ class DefaultUnloadDllDebugEventHandler : public AbstractUnloadDllDebugEventHand
 private:
     void HandleDebugEvent(const UnloadDllDebugEvent& event) override;
 
-    void LogUnloadDll(const std::string& libraryName, ULONG_PTR baseAddress) const override;
-
     void LogUnloadDll(const std::wstring& libraryName, ULONG_PTR baseAddress) const override;
 
 public:
-    explicit DefaultUnloadDllDebugEventHandler(std::map<std::string, ULONG_PTR>& ansiLibraries,
-                                               std::map<std::wstring, ULONG_PTR>& unicodeLibraries,
+    explicit DefaultUnloadDllDebugEventHandler(std::map<std::wstring, ULONG_PTR>& libraries,
                                                std::optional<std::reference_wrapper<const Logger>> logger)
-            : AbstractUnloadDllDebugEventHandler(ansiLibraries, unicodeLibraries, logger) {}
+            : AbstractUnloadDllDebugEventHandler(libraries, logger) {}
 
     ~DefaultUnloadDllDebugEventHandler() override = default;
 };

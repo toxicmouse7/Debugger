@@ -36,8 +36,7 @@ private:
     inline static Debugger* instance = nullptr;
     HANDLE processHandle = nullptr;
     DebuggerState state = DebuggerState::NotStarted;
-    std::map<std::string, ULONG_PTR> ansiLibraries;
-    std::map<std::wstring, ULONG_PTR> unicodeLibraries;
+    std::map<std::wstring, ULONG_PTR> libraries;
     std::map<DWORD, ULONG_PTR> threads;
     std::list<std::shared_ptr<Breakpoint>> breakpoints;
     bool isWow64 = false;
@@ -401,26 +400,15 @@ public:
         errorLogger = logger;
     }
 
-    [[nodiscard]] ULONG_PTR GetLibraryAddress(const std::string& libraryName) const
-    {
-        return ansiLibraries.at(libraryName);
-    }
-
     [[nodiscard]] ULONG_PTR GetLibraryAddress(const std::wstring& libraryName) const
     {
-        return unicodeLibraries.at(libraryName);
-    }
-
-    [[nodiscard]] ULONG_PTR GetProcAddress(const std::string& libraryName, const std::string& functionName) const
-    {
-        return ProcessMemoryManipulation::GetProcAddressEx(processHandle, ansiLibraries.at(libraryName),
-                                                           functionName, isWow64);
+        return libraries.at(libraryName);
     }
 
     [[nodiscard]] ULONG_PTR GetProcAddress(const std::wstring& libraryName, const std::string& functionName) const
     {
 
-        return ProcessMemoryManipulation::GetProcAddressEx(processHandle, unicodeLibraries.at(libraryName),
+        return ProcessMemoryManipulation::GetProcAddressEx(processHandle, libraries.at(libraryName),
                                                            functionName, isWow64);
     }
 
@@ -432,7 +420,7 @@ public:
     template<Derived<AbstractLoadDllDebugEventHandler> LoadDllHandler>
     void AddLoadDllHandler(const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
     {
-        AddRecipient(DebugEventHandlerType::eLoadDll, new LoadDllHandler(ansiLibraries, unicodeLibraries, logger));
+        AddRecipient(DebugEventHandlerType::eLoadDll, new LoadDllHandler(libraries, logger));
     }
 
     template<Derived<AbstractCreateProcessDebugEventHandler> CreateProcessHandler>
@@ -462,7 +450,7 @@ public:
     template<Derived<AbstractUnloadDllDebugEventHandler> UnloadDllHandler>
     void AddUnloadDllHandler(const std::optional<std::reference_wrapper<const Logger>>& logger = std::nullopt)
     {
-        AddRecipient(DebugEventHandlerType::eUnloadDll, new UnloadDllHandler(ansiLibraries, unicodeLibraries, logger));
+        AddRecipient(DebugEventHandlerType::eUnloadDll, new UnloadDllHandler(libraries, logger));
     }
 
     template<Derived<AbstractExceptionDebugEventHandler> ExceptionHandler>

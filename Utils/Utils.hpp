@@ -26,12 +26,6 @@ public:
 
     static std::list<std::wstring> Split(const std::wstring& str, const std::wstring& delimiter);
 
-    static std::optional<std::string>
-    FindLibraryByAddress(const std::list<std::pair<std::string, ULONG_PTR>>& libraries, ULONG_PTR address);
-
-    static std::optional<std::wstring>
-    FindLibraryByAddress(const std::list<std::pair<std::wstring, ULONG_PTR>>& libraries, ULONG_PTR address);
-
     static std::string FormatAddress(ULONG_PTR address, const std::string& delimiter);
 
     static std::wstring FormatAddress(ULONG_PTR address, const std::wstring& delimiter);

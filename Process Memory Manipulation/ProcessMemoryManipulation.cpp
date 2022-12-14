@@ -123,12 +123,12 @@ void ProcessMemoryManipulation::WriteBytes(DWORD processId, ULONG_PTR address, B
 }
 
 ULONG_PTR ProcessMemoryManipulation::GetProcAddressEx(HANDLE hProcess, ULONG_PTR moduleBase,
-                                                      const std::string& function, bool isWow64)
+                                                      const std::string& functionName, bool isWow64)
 {
     if (isWow64)
-        return GetProcAddressEx32(hProcess, moduleBase, function);
+        return GetProcAddressEx32(hProcess, moduleBase, functionName);
 
-    return GetProcAddressEx64(hProcess, moduleBase, function);
+    return GetProcAddressEx64(hProcess, moduleBase, functionName);
 }
 
 ULONG_PTR ProcessMemoryManipulation::GetProcAddressEx32(HANDLE hProcess, ULONG_PTR moduleBase,

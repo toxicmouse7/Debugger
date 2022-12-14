@@ -25,7 +25,7 @@ public:
 
     static void ReadBytes(DWORD processId, ULONG_PTR address, BYTE* buffer, size_t size);
 
-    static ULONG_PTR GetProcAddressEx(HANDLE hProcess, ULONG_PTR moduleBase, const std::string& function, bool isWow64);
+    static ULONG_PTR GetProcAddressEx(HANDLE hProcess, ULONG_PTR moduleBase, const std::string& functionName, bool isWow64);
 
 private:
     static ULONG_PTR GetProcAddressEx32(HANDLE hProcess, ULONG_PTR moduleBase, const std::string& function);

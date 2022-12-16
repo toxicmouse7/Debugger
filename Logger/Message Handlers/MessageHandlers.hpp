@@ -6,5 +6,6 @@
 #define DEBUGGER_MESSAGEHANDLERS_HPP
 
 #include "ConsoleMessageHandler.hpp"
+#include "FileMessageHandler.hpp"
 
 #endif //DEBUGGER_MESSAGEHANDLERS_HPP

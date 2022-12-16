@@ -1,2 +1,5 @@
 # Project exclude paths
 /cmake-build-debug-x64/
+/cmake-build-release-visual-studio
+/venv
+/DbgCtl/__pycache__/

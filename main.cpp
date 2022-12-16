@@ -168,7 +168,8 @@ int main()
     auto debugger = Debugger::GetInstance();
     auto& logger = Logger::GetInstance("Debugger");
 
-    logger.AddMessageHandler(new ConsoleMessageHandler());
+    //logger.AddMessageHandler(new ConsoleMessageHandler());
+    logger.AddMessageHandler(new FileMessageHandler("debugger.log"));
 
     debugger->AddLoadDllHandler<DefaultLoadDllDebugEventHandler>(logger);
     debugger->AddCreateProcessHandler<DefaultCreateProcessDebugEventHandler>(logger);
@@ -181,33 +182,20 @@ int main()
 
     auto& debuggerState = debugger->CreateAndAttach(
             R"(C:\Users\Aleksej\CLionProjects\test123\cmake-build-debug-x86\test.exe)");
+//    auto& debuggerState = debugger->CreateAndAttach(
+//            R"(C:\Windows\notepad.exe)");
 
 //    debugger->WaitForEntry(false);
 //
-////    AddFunctionsToDatabase(debugger->IsWow64());
-////    AddStructuresToDatabase(debugger->IsWow64());
-////    AddBitfieldsToDatabase();
-//
-////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernelbase.dll", "ExitProcess"));
-////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "CreateProcessA"));
-////    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "TerminateProcess"));
-//
-//    while (debuggerState != DebuggerState::Stopped)
-//    {
-//        auto exceptionContext = debugger->WaitForDebugEvent();
-//
-//        if (exceptionContext.IsExternal() && exceptionContext.Type() != ExceptionContextType::eHardBreakpoint)
-//        {
-//            debugger->UseResolver<DefaultExceptionDebugEventHandler>(exceptionContext, logger);
-//        }
-//        else
-//        {
-////            debugger->UseResolver<TraceResolver>(exceptionContext, logger);
-//            debugger->UseResolver<DumpFunction>(exceptionContext, logger);
-//        }
-//    }
-
     debugger->WaitForEntry(true);
+
+//    AddFunctionsToDatabase(debugger->IsWow64());
+//    AddStructuresToDatabase(debugger->IsWow64());
+//    AddBitfieldsToDatabase();
+
+//    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernelbase.dll", "ExitProcess"));
+//    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "CreateProcessA"));
+//    debugger->SetBreakpoint(debugger->GetProcAddress(L"kernel32.dll", "TerminateProcess"));
 
     while (debuggerState != DebuggerState::Stopped)
     {
@@ -220,6 +208,7 @@ int main()
         else
         {
             debugger->UseResolver<TraceFunctionsResolver>(exceptionContext, logger);
+           // debugger->UseResolver<DumpFunction>(exceptionContext, logger);
         }
     }
 

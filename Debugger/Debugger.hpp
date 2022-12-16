@@ -6,6 +6,7 @@
 #define DEBUGGER_DEBUGGER_HPP
 
 #include <Windows.h>
+#include <DbgHelp.h>
 #include <filesystem>
 #include <memory>
 #include <map>
@@ -40,6 +41,7 @@ private:
     std::map<DWORD, ULONG_PTR> threads;
     std::list<std::shared_ptr<Breakpoint>> breakpoints;
     bool isWow64 = false;
+    bool useSymbols = true;
 
     std::optional<std::reference_wrapper<const Logger>> errorLogger;
 
@@ -110,6 +112,11 @@ private:
         this->processHandle = processInformation.hProcess;
 
         CloseHandle(processInformation.hThread);
+
+        if (!SymInitialize(processHandle, nullptr, FALSE))
+        {
+            useSymbols = false;
+        }
     }
 
     void DebugLoop()
